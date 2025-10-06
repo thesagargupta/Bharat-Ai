@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Image from "next/image";
 import { FiSend, FiX, FiMessageSquare, FiSettings, FiMenu, FiUser, FiUpload } from "react-icons/fi";
 import ToolSelector from "../../../components/ToolSelector";
@@ -9,6 +10,9 @@ import ChatMessage from "../../../components/ChatMessage";
 function ChatContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session, status } = useSession();
+  
+  // ALL HOOKS MUST BE AT THE TOP - Before any conditional returns
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [selectedTools, setSelectedTools] = useState([]);
@@ -18,6 +22,13 @@ function ChatContent() {
   const scrollRef = useRef(null);
   const messageCounter = useRef(0);
   const hasInitialized = useRef(false);
+  
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login?callbackUrl=/chat");
+    }
+  }, [status, router]);
 
   useEffect(() => {
     // Get initial message from URL params only once
@@ -53,6 +64,23 @@ function ChatContent() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+  
+  // Show loading state while checking authentication (AFTER all hooks)
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Don't render content until authenticated (AFTER all hooks)
+  if (status === "unauthenticated") {
+    return null;
+  }
 
   function scrollToBottom() {
     if (!scrollRef.current) return;
@@ -208,13 +236,31 @@ function ChatContent() {
                 <p className="text-xs sm:text-sm text-gray-500">Online now</p>
               </div>
             </div>
-            {/* User Icon */}
+            {/* User Avatar */}
             <button 
               onClick={() => router.push('/profile')}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors group"
+              className="relative hover:opacity-80 transition-opacity group"
               title="View Profile"
             >
-              <FiUser size={20} className="text-gray-600 group-hover:text-gray-900" />
+              {session?.user?.image ? (
+                <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 group-hover:border-blue-500 transition-colors">
+                  <Image
+                    src={session.user.image}
+                    alt={session.user.name || "User"}
+                    width={40}
+                    height={40}
+                    className="w-full h-full object-cover"
+                    unoptimized={session.user.image.startsWith('http')}
+                    onError={(e) => {
+                      e.currentTarget.src = '/logo.png';
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center border-2 border-gray-200 group-hover:border-blue-500 transition-colors">
+                  <FiUser size={20} className="text-white" />
+                </div>
+              )}
             </button>
           </div>
         </div>

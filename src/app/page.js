@@ -1,14 +1,42 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { FiSend, FiUpload, FiMessageSquare, FiImage } from "react-icons/fi";
 import BharatAiLogo from "./logo";
 
 export default function Home() {
   const router = useRouter();
+  const { data: session, status } = useSession();
+  
+  // ALL HOOKS MUST BE AT THE TOP - Before any conditional returns
   const [message, setMessage] = useState("");
   const [uploadedPreview, setUploadedPreview] = useState(null);
   const fileRef = useRef(null);
+  
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    }
+  }, [status, router]);
+  
+  // Show loading state while checking authentication
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Don't render content until authenticated
+  if (status === "unauthenticated") {
+    return null;
+  }
 
   function handleUploadClick() {
     if (fileRef.current) fileRef.current.click();

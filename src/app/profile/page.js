@@ -1,21 +1,46 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
-import { FiArrowLeft, FiUser, FiMail, FiCalendar, FiEdit2, FiCamera } from "react-icons/fi";
+import { FiArrowLeft, FiUser, FiMail, FiCalendar, FiEdit2, FiCamera, FiLogOut } from "react-icons/fi";
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
+  
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login?callbackUrl=/profile");
+    }
+  }, [status, router]);
+  
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState({
-    name: "Sagar Gupta",
-    email: "sagar@bharatai.com",
-    joinedDate: "October 2025",
+    name: session?.user?.name || "User",
+    email: session?.user?.email || "",
+    joinedDate: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
     bio: "AI enthusiast and developer passionate about creating intelligent solutions.",
-    avatar: "/logo.png"
+    avatar: session?.user?.image || "/logo.png"
   });
 
   const [editForm, setEditForm] = useState({ ...profile });
+  
+  // Update profile when session loads
+  useEffect(() => {
+    if (session?.user) {
+      const updatedProfile = {
+        name: session.user.name || "User",
+        email: session.user.email || "",
+        joinedDate: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        bio: profile.bio || "AI enthusiast and developer passionate about creating intelligent solutions.",
+        avatar: session.user.image || "/logo.png"
+      };
+      setProfile(updatedProfile);
+      setEditForm(updatedProfile);
+    }
+  }, [session]);
 
   const handleSave = () => {
     setProfile({ ...editForm });
@@ -26,24 +51,55 @@ export default function ProfilePage() {
     setEditForm({ ...profile });
     setIsEditing(false);
   };
+  
+  const handleSignOut = async () => {
+    await signOut({ callbackUrl: '/login' });
+  };
+  
+  // Show loading state while checking authentication
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Don't render content until authenticated
+  if (status === "unauthenticated") {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.back()}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label="Go back"
-            >
-              <FiArrowLeft size={24} className="text-gray-700" />
-            </button>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Profile</h1>
-              <p className="text-sm text-gray-500">Manage your account information</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.back()}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                aria-label="Go back"
+              >
+                <FiArrowLeft size={24} className="text-gray-700" />
+              </button>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Profile</h1>
+                <p className="text-sm text-gray-500">Manage your account information</p>
+              </div>
             </div>
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors"
+              title="Sign Out"
+            >
+              <FiLogOut size={18} />
+              <span className="hidden sm:inline">Sign Out</span>
+            </button>
           </div>
         </div>
       </div>
@@ -63,10 +119,14 @@ export default function ProfilePage() {
                 <div className="w-32 h-32 rounded-full border-4 border-white shadow-xl bg-white overflow-hidden">
                   <Image
                     src={profile.avatar}
-                    alt="Profile"
+                    alt={`${profile.name}'s profile picture`}
                     width={128}
                     height={128}
                     className="w-full h-full object-cover"
+                    unoptimized={profile.avatar.startsWith('http')}
+                    onError={(e) => {
+                      e.currentTarget.src = '/logo.png';
+                    }}
                   />
                 </div>
                 <button className="absolute bottom-2 right-2 p-2 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-colors">
