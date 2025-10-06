@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { FiSend, FiX, FiMessageSquare, FiSettings, FiMenu, FiUser, FiUpload } from "react-icons/fi";
 import ToolSelector from "../../../components/ToolSelector";
 import ChatMessage from "../../../components/ChatMessage";
 
-export default function ChatPage() {
+function ChatContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [message, setMessage] = useState("");
@@ -357,5 +357,26 @@ export default function ChatPage() {
         onChange={handleFile}
       />
     </div>
+  );
+}
+
+// Loading fallback component
+function ChatLoading() {
+  return (
+    <div className="h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-gray-600">Loading chat...</p>
+      </div>
+    </div>
+  );
+}
+
+// Main export with Suspense boundary
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<ChatLoading />}>
+      <ChatContent />
+    </Suspense>
   );
 }
