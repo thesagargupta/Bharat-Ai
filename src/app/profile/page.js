@@ -17,6 +17,7 @@ export default function ProfilePage() {
   }, [status, router]);
   
   const [isEditing, setIsEditing] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [profile, setProfile] = useState({
     name: session?.user?.name || "User",
     email: session?.user?.email || "",
@@ -53,16 +54,19 @@ export default function ProfilePage() {
   };
   
   const handleSignOut = async () => {
+    setIsSigningOut(true);
     await signOut({ callbackUrl: '/login' });
   };
   
-  // Show loading state while checking authentication
-  if (status === "loading") {
+  // Show loading state while checking authentication or signing out
+  if (status === "loading" || isSigningOut) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600">
+            {isSigningOut ? "Signing out..." : "Loading..."}
+          </p>
         </div>
       </div>
     );
@@ -94,11 +98,21 @@ export default function ProfilePage() {
             </div>
             <button
               onClick={handleSignOut}
-              className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors"
+              disabled={isSigningOut}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Sign Out"
             >
-              <FiLogOut size={18} />
-              <span className="hidden sm:inline">Sign Out</span>
+              {isSigningOut ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span className="hidden sm:inline">Signing out...</span>
+                </>
+              ) : (
+                <>
+                  <FiLogOut size={18} />
+                  <span className="hidden sm:inline">Sign Out</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -109,7 +123,15 @@ export default function ProfilePage() {
         {/* Profile Card */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
           {/* Cover Image */}
-          <div className="h-32 bg-gradient-to-r from-blue-500 to-purple-600"></div>
+          <div className="h-32 relative overflow-hidden">
+            <Image
+              src="/tricolor.png"
+              alt="Cover"
+              fill
+              className="object-cover"
+              priority
+            />
+          </div>
 
           {/* Profile Info */}
           <div className="px-6 sm:px-8 pb-8">
@@ -249,7 +271,7 @@ export default function ProfilePage() {
         {/* Footer Info */}
         <div className="text-center py-8">
           <p className="text-sm text-gray-500">
-            Bharat AI v1.0.0 • Made with ❤️ by Sagar Gupta
+            Bharat AI v1.0.0 •<br></br> Made with ❤️ by Sagar Gupta
           </p>
         </div>
       </div>

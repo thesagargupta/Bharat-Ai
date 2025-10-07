@@ -70,7 +70,7 @@ function ChatContent() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading...</p>
         </div>
       </div>
@@ -165,7 +165,7 @@ function ChatContent() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="relative group">
-                <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 blur opacity-25 group-hover:opacity-40 transition-opacity"></div>
+                <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-orange-500 to-orange-500 blur opacity-25 group-hover:opacity-40 transition-opacity"></div>
                 <div className="relative bg-white rounded-full p-2 shadow-lg">
                   <Image 
                     src="/logo.png" 
@@ -411,7 +411,7 @@ function ChatLoading() {
   return (
     <div className="h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-center">
-        <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
         <p className="text-gray-600">Loading chat...</p>
       </div>
     </div>
