@@ -129,7 +129,16 @@ function LoginContent() {
 
         {/* Bottom Text */}
         <p className="text-center text-sm text-gray-500 mt-6">
-          Made With ❤️ by Sagar Gupta
+          Made With ❤️ by{" "}
+          <a 
+            href="https://sagarguptaportfolio.netlify.app/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-gray-700 font-semibold hover:text-orange-600 transition-colors"
+            style={{ textDecoration: 'none' }}
+          >
+            Sagar Gupta
+          </a>
         </p>
       </div>
     </div>

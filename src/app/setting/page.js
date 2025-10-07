@@ -417,7 +417,16 @@ export default function SettingsPage() {
         {/* Footer Info */}
         <div className="text-center pb-4 pt-4">
           <p className="text-sm text-gray-500">
-            Bharat AI v1.0.0 • <br></br>Made with ❤️ by Sagar Gupta
+            Bharat AI v1.0.0 • <br></br>Made with ❤️ by{" "}
+            <a 
+              href="https://sagarguptaportfolio.netlify.app/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-gray-700 font-semibold hover:text-orange-600 transition-colors"
+              style={{ textDecoration: 'none' }}
+            >
+              Sagar Gupta
+            </a>
           </p>
         </div>
       </div>

@@ -1,0 +1,29 @@
+# Bharat AI - Robots.txt
+# https://thebharatai.vercel.app/robots.txt
+
+User-agent: *
+Allow: /
+Allow: /login
+Disallow: /api/
+Disallow: /profile
+Disallow: /setting
+Disallow: /chat
+
+# Allow specific bots
+User-agent: Googlebot
+Allow: /
+Allow: /login
+
+User-agent: Bingbot
+Allow: /
+Allow: /login
+
+User-agent: Slurp
+Allow: /
+Allow: /login
+
+# Sitemap location
+Sitemap: https://thebharatai.vercel.app/sitemap.xml
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
