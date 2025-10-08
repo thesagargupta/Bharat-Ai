@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { FiArrowLeft, FiShield, FiLock, FiEye, FiDatabase, FiUsers } from "react-icons/fi";
+import { SiAdguard } from "react-icons/si";
 
 export default function PrivacyPolicyPage() {
   const router = useRouter();
@@ -20,7 +21,7 @@ export default function PrivacyPolicyPage() {
             </button>
             <div className="flex items-center gap-3">
               <div className="p-2 bg-orange-100 rounded-lg">
-                <FiShield size={24} className="text-orange-600" />
+                <SiAdguard size={24} className="text-orange-600" />
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Privacy Policy</h1>
