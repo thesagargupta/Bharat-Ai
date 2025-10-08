@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { 
   FiArrowLeft, 
   FiMoon, 
@@ -19,6 +20,15 @@ import {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
+  
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login?callbackUrl=/setting");
+    }
+  }, [status, router]);
+  
   const [settings, setSettings] = useState({
     theme: "light",
     notifications: true,
@@ -36,6 +46,23 @@ export default function SettingsPage() {
     message: ""
   });
   const [feedbackSent, setFeedbackSent] = useState(false);
+
+  // Show loading state while checking authentication
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Don't render content until authenticated
+  if (status === "unauthenticated") {
+    return null;
+  }
 
   const handleToggle = (key) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));

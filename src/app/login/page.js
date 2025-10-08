@@ -120,9 +120,21 @@ function LoginContent() {
           <div className="text-center text-sm text-gray-600">
             <p>By signing in, you agree to our</p>
             <p className="mt-1">
-              <span className="text-purple-600 hover:underline cursor-pointer">Terms of Service</span>
+              <a 
+                href="/terms-of-use" 
+                className="text-orange-600 hover:underline cursor-pointer font-medium"
+                style={{ textDecoration: 'none' }}
+              >
+                Terms of Use
+              </a>
               {" "}and{" "}
-              <span className="text-purple-600 hover:underline cursor-pointer">Privacy Policy</span>
+              <a 
+                href="/privacy-policy" 
+                className="text-green-600 hover:underline cursor-pointer font-medium"
+                style={{ textDecoration: 'none' }}
+              >
+                Privacy Policy
+              </a>
             </p>
           </div>
         </div>

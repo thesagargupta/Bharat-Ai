@@ -4,6 +4,8 @@
 User-agent: *
 Allow: /
 Allow: /login
+Allow: /privacy-policy
+Allow: /terms-of-use
 Disallow: /api/
 Disallow: /profile
 Disallow: /setting
@@ -13,14 +15,20 @@ Disallow: /chat
 User-agent: Googlebot
 Allow: /
 Allow: /login
+Allow: /privacy-policy
+Allow: /terms-of-use
 
 User-agent: Bingbot
 Allow: /
 Allow: /login
+Allow: /privacy-policy
+Allow: /terms-of-use
 
 User-agent: Slurp
 Allow: /
 Allow: /login
+Allow: /privacy-policy
+Allow: /terms-of-use
 
 # Sitemap location
 Sitemap: https://thebharatai.vercel.app/sitemap.xml
