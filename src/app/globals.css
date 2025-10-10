@@ -96,3 +96,47 @@ body {
 .chat-scroll::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
+
+/* Typing animation */
+@keyframes typing-dots {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
+}
+
+.typing-dot {
+  animation: typing-dots 1.5s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 200ms;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 400ms;
+}
+
+/* Gradient animation for AI avatar */
+@keyframes gradient-pulse {
+  0%, 100% {
+    background-size: 200% 200%;
+    background-position: 0% 50%;
+  }
+  50% {
+    background-size: 200% 200%;
+    background-position: 100% 50%;
+  }
+}
+
+.ai-avatar-typing {
+  animation: gradient-pulse 2s ease-in-out infinite;
+}

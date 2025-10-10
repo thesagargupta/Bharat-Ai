@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { MdDelete } from "react-icons/md";
 import { BiMenuAltLeft } from "react-icons/bi";
 import Image from "next/image";
-import { FiSend, FiX, FiMessageSquare, FiSettings, FiMenu, FiUser, FiUpload } from "react-icons/fi";
+import { FiSend, FiX, FiMessageSquare, FiSettings, FiUser, FiUpload, FiImage } from "react-icons/fi";
 import ToolSelector from "../../../components/ToolSelector";
 import ChatMessage from "../../../components/ChatMessage";
 
@@ -23,106 +23,221 @@ function ChatContent() {
   const [uploadedPreview, setUploadedPreview] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [chats, setChats] = useState([]);
-  // Load chats from localStorage only once
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('bharatai_chats');
-      if (saved) {
-        try {
-          setChats(JSON.parse(saved));
-        } catch {
-          setChats([]);
-        }
-      }
-    }
-  }, []);
-
-  // Track if all chats have been deleted (for future use, but do not block new chat creation)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if (chats.length === 0) {
-        localStorage.setItem('bharatai_chats_deleted', 'true');
-      } else {
-        localStorage.removeItem('bharatai_chats_deleted');
-      }
-    }
-  }, [chats]);
   const [currentChatId, setCurrentChatId] = useState(null);
+  const [isLoadingChats, setIsLoadingChats] = useState(true);
+  const [isTyping, setIsTyping] = useState(false);
+  const [isImageGenMode, setIsImageGenMode] = useState(false);
+
   const fileRef = useRef(null);
   const scrollRef = useRef(null);
   const messageCounter = useRef(0);
   const hasInitialized = useRef(false);
+  const typingRef = useRef(null);
   
-  // Redirect to login if not authenticated
+  // IMPLEMENTED: Redirect to login if not authenticated
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login?callbackUrl=/chat");
     }
   }, [status, router]);
 
-  // Persist chats to localStorage
+  // Auto scroll to typing animation
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('bharatai_chats', JSON.stringify(chats));
+    if (isTyping && typingRef.current) {
+      setTimeout(() => {
+        typingRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'end' 
+        });
+      }, 100);
     }
-  }, [chats]);
+  }, [isTyping]);
 
-  // Track if chats have loaded from localStorage
-  const [chatsLoaded, setChatsLoaded] = useState(false);
-  useEffect(() => {
-    if (!chatsLoaded && chats.length >= 0) {
-      setChatsLoaded(true);
-    }
-  }, [chats]);
-
-  useEffect(() => {
-    // Only run after chats are loaded from localStorage
-    if (!chatsLoaded || hasInitialized.current) return;
-    const initialMessage = searchParams.get('message');
-    if (initialMessage) {
-      hasInitialized.current = true;
-      // Always create a new chat for a new message from landing page
-      const topic = initialMessage.slice(0, 30) || "New Chat";
-      const newChatId = `chat-${Date.now()}`;
-      const userMsg = {
-        id: `msg-${Date.now()}-1`,
+  // Handle image generation
+  async function handleImageGeneration(prompt) {
+    setIsTyping(true);
+    
+    try {
+      // Add user message to UI immediately
+      const tempUserMessage = {
+        id: `temp-${Date.now()}`,
         role: "user",
-        text: initialMessage,
-        image: null,
+        content: `🎨 Generate image: ${prompt}`,
+        timestamp: new Date(),
       };
-      const assistantMsg = {
-        id: `msg-${Date.now()}-2`,
-        role: "assistant",
-        text: `I understand you're asking about: "${initialMessage}". I'm here to help you with any questions, tasks, or creative projects you have in mind. How can I assist you further?`,
-      };
-      const newChat = {
-        id: newChatId,
-        topic,
-        messages: [userMsg, assistantMsg],
-        created: Date.now(),
-      };
-      setChats((prev) => [newChat, ...prev]);
-      setCurrentChatId(newChatId);
-      setMessages([userMsg, assistantMsg]);
-      // Remove message param from URL so it doesn't trigger again on refresh
-      if (typeof window !== 'undefined') {
-        const url = new URL(window.location.href);
-        url.searchParams.delete('message');
-        window.history.replaceState({}, '', url.pathname + url.search);
+      
+      setMessages(prev => [...prev, tempUserMessage]);
+
+      // Generate image
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt,
+          model: 'stable-diffusion',
+          size: '1024x1024'
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Create AI response with generated image
+        const aiResponse = {
+          id: `ai-${Date.now()}`,
+          role: "assistant",
+          content: `I've generated an image based on your prompt: "${prompt}"`,
+          image: { url: data.image.url },
+          timestamp: new Date(),
+        };
+
+        // Update messages - remove temp and add both user and AI messages
+        setMessages(prev => {
+          const withoutTemp = prev.filter(msg => msg.id !== tempUserMessage.id);
+          return [...withoutTemp, tempUserMessage, aiResponse];
+        });
+
+        // Save to database if we have a current chat
+        if (currentChatId) {
+          try {
+            await fetch('/api/chats', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                message: `🎨 Generate image: ${prompt}`,
+                chatId: currentChatId,
+                generatedImage: data.image.url,
+              }),
+            });
+          } catch (saveError) {
+            console.error('Error saving to database:', saveError);
+          }
+        }
+
+        // Exit image generation mode
+        setIsImageGenMode(false);
+        
+      } else {
+        const errorData = await response.json();
+        // Remove temp message and show error
+        setMessages(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
+        alert(errorData.error || 'Failed to generate image');
       }
+
+    } catch (error) {
+      console.error('Error generating image:', error);
+      // Remove temp message on error
+      setMessages(prev => prev.filter(msg => msg.id.startsWith('temp-')));
+      alert('An error occurred while generating the image.');
+    } finally {
+      setIsTyping(false);
     }
-  }, [searchParams, chatsLoaded]);
+  }
+
+  // Load chats from database
+  useEffect(() => {
+    const loadChats = async () => {
+      if (session?.user) {
+        try {
+          const response = await fetch('/api/chats');
+          if (response.ok) {
+            const data = await response.json();
+            setChats(data.chats);
+            
+            // Load the most recent chat if available
+            if (data.chats.length > 0 && !currentChatId) {
+              const recentChat = data.chats[0];
+              await loadChatMessages(recentChat.id);
+            }
+          }
+        } catch (error) {
+          console.error('Error loading chats:', error);
+        } finally {
+          setIsLoadingChats(false);
+        }
+      }
+    };
+
+    if (session?.user) {
+      loadChats();
+    }
+  }, [session]);
+
+  // Handle initial message from URL
+  useEffect(() => {
+    const handleInitialMessage = async () => {
+      if (hasInitialized.current || !session?.user) return;
+      
+      const initialMessage = searchParams.get('message');
+      if (initialMessage && !isLoadingChats) {
+        hasInitialized.current = true;
+        
+        try {
+          // Send message to create new chat with AI response
+          const response = await fetch('/api/chats', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: initialMessage,
+            }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            
+            // Add new chat to the list
+            const newChat = {
+              id: data.chatId,
+              title: data.chatTitle,
+              messageCount: 2,
+              lastMessage: data.assistantMessage.content.slice(0, 100),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+            
+            setChats(prev => [newChat, ...prev]);
+            setCurrentChatId(data.chatId);
+            setMessages([data.userMessage, data.assistantMessage]);
+          }
+        } catch (error) {
+          console.error('Error sending initial message:', error);
+        }
+
+        // Remove message param from URL
+        if (typeof window !== 'undefined') {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('message');
+          window.history.replaceState({}, '', url.pathname + url.search);
+        }
+      }
+    };
+
+    handleInitialMessage();
+  }, [searchParams, session, isLoadingChats]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  // When currentChatId changes, load its messages
-  useEffect(() => {
-    if (!currentChatId) return;
-    const chat = chats.find((c) => c.id === currentChatId);
-    if (chat) setMessages(chat.messages);
-  }, [currentChatId]);
+  // Load messages for a specific chat
+  const loadChatMessages = async (chatId) => {
+    try {
+      const response = await fetch(`/api/chats/${chatId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentChatId(chatId);
+        setMessages(data.chat.messages);
+      }
+    } catch (error) {
+      console.error('Error loading chat messages:', error);
+    }
+  };
   
   // Show loading state while checking authentication (AFTER all hooks)
   if (status === "loading") {
@@ -136,7 +251,7 @@ function ChatContent() {
     );
   }
   
-  // Don't render content until authenticated (AFTER all hooks)
+  // IMPLEMENTED: Don't render content until authenticated (AFTER all hooks)
   if (status === "unauthenticated") {
     return null;
   }
@@ -147,10 +262,21 @@ function ChatContent() {
   }
 
   function toggleTool(id) {
-    setSelectedTools((prev) => {
-      if (prev.includes(id)) return prev.filter((p) => p !== id);
-      return [...prev, id];
-    });
+    if (id === "image-gen") {
+      setIsImageGenMode(!isImageGenMode);
+      // Clear other selected tools when switching to image gen mode
+      if (!isImageGenMode) {
+        setSelectedTools([]);
+        setUploadedPreview(null);
+      }
+    } else {
+      // Disable image gen mode when selecting other tools
+      setIsImageGenMode(false);
+      setSelectedTools((prev) => {
+        if (prev.includes(id)) return prev.filter((p) => p !== id);
+        return [...prev, id];
+      });
+    }
   }
 
   function handleUploadClick() {
@@ -176,106 +302,137 @@ function ChatContent() {
     }
   }
 
-  function handleSend() {
+  // Function to exit image generation mode
+  function exitImageGenMode() {
+    setIsImageGenMode(false);
+    setMessage('');
+  }
+
+  async function handleSend() {
     if (!message.trim() && !uploadedPreview) return;
-    messageCounter.current += 1;
-    const userMsg = {
-      id: `msg-${Date.now()}-${messageCounter.current}`,
-      role: "user",
-      text: message.trim() || "",
-      image: uploadedPreview || null,
-    };
 
-    // If no chat exists, create a new chat
-    if (!currentChatId) {
-      const newChatId = `chat-${Date.now()}`;
-      const newChat = {
-        id: newChatId,
-        topic: userMsg.text.slice(0, 30) || "New Chat",
-        messages: [userMsg],
-        created: Date.now(),
-      };
-      setChats((prev) => [newChat, ...prev]);
-      setCurrentChatId(newChatId);
-      setMessages([userMsg]);
-
-      // Simulated AI response
-      setTimeout(() => {
-        messageCounter.current += 1;
-        const assistantMsg = {
-          id: `msg-${Date.now()}-${messageCounter.current}`,
-          role: "assistant",
-          text: uploadedPreview
-            ? "I can see your image! I can help you analyze it, describe it, or generate similar variations. What would you like me to do with it?"
-            : `I understand you're asking about: "${userMsg.text}". I'm here to help you with any questions, tasks, or creative projects you have in mind. How can I assist you further?`,
-        };
-        setMessages((m) => [...m, assistantMsg]);
-        setChats((prev) => prev.map((chat) =>
-          chat.id === newChatId
-            ? { ...chat, messages: [...chat.messages, assistantMsg] }
-            : chat
-        ));
-      }, 1000);
-      setMessage("");
-      return;
-    }
-
-    // Otherwise, add to current chat
-    const updatedMessages = [...messages, userMsg];
-    setMessages(updatedMessages);
+    const messageText = message.trim();
     setMessage("");
-
-    // Simulated AI response
-    setTimeout(() => {
-      messageCounter.current += 1;
-      const assistantMsg = {
-        id: `msg-${Date.now()}-${messageCounter.current}`,
-        role: "assistant",
-        text: uploadedPreview
-          ? "I can see your image! I can help you analyze it, describe it, or generate similar variations. What would you like me to do with it?"
-          : `I understand you're asking about: "${userMsg.text}". I'm here to help you with any questions, tasks, or creative projects you have in mind. How can I assist you further?`,
-      };
-      const newMessages = [...updatedMessages, assistantMsg];
-      setMessages(newMessages);
-      // Update chat topic if first message
-      if (currentChatId) {
-        setChats((prev) => prev.map((chat) =>
-          chat.id === currentChatId
-            ? { ...chat, messages: newMessages, topic: chat.messages.length === 0 ? userMsg.text.slice(0, 30) || "New Chat" : chat.topic }
-            : chat
-        ));
+    setIsTyping(true);
+    
+    try {
+      // Handle image generation mode
+      if (isImageGenMode) {
+        await handleImageGeneration(messageText);
+        return;
       }
-    }, 1000);
-    // Update chat messages
-    if (currentChatId) {
-      setChats((prev) => prev.map((chat) =>
-        chat.id === currentChatId
-          ? { ...chat, messages: updatedMessages, topic: chat.messages.length === 0 ? userMsg.text.slice(0, 30) || "New Chat" : chat.topic }
-          : chat
-      ));
+
+      // Prepare image data if exists
+      let imageData = null;
+      if (uploadedPreview) {
+        const response = await fetch(uploadedPreview);
+        const blob = await response.blob();
+        const buffer = await blob.arrayBuffer();
+        imageData = {
+          data: Buffer.from(buffer).toString('base64'),
+          type: blob.type,
+        };
+      }
+
+      // Add user message to UI immediately
+      const tempUserMessage = {
+        id: `temp-${Date.now()}`,
+        role: "user",
+        content: messageText,
+        image: uploadedPreview ? { url: uploadedPreview } : undefined,
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, tempUserMessage]);
+
+      // Clear uploaded image immediately after adding user message
+      if (uploadedPreview) {
+        URL.revokeObjectURL(uploadedPreview);
+        setUploadedPreview(null);
+        setSelectedTools(prev => prev.filter(tool => tool !== "upload"));
+      }
+
+      // Send to API
+      const response = await fetch('/api/chats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: messageText,
+          chatId: currentChatId,
+          imageData: imageData,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Update messages with real IDs and AI response
+        setMessages(prev => {
+          const withoutTemp = prev.filter(msg => msg.id !== tempUserMessage.id);
+          return [...withoutTemp, data.userMessage, data.assistantMessage];
+        });
+
+        // Update or add chat to list
+        if (data.isNewChat) {
+          const newChat = {
+            id: data.chatId,
+            title: data.chatTitle,
+            messageCount: 2,
+            lastMessage: data.assistantMessage.content.slice(0, 100),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          setChats(prev => [newChat, ...prev]);
+          setCurrentChatId(data.chatId);
+        } else {
+          // Update existing chat
+          setChats(prev => prev.map(chat => 
+            chat.id === data.chatId 
+              ? {
+                  ...chat,
+                  messageCount: chat.messageCount + 2,
+                  lastMessage: data.assistantMessage.content.slice(0, 100),
+                  updatedAt: new Date(),
+                }
+              : chat
+          ));
+        }
+      } else {
+        // Remove temp message on error
+        setMessages(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
+        alert('Failed to send message. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Remove temp message on error
+      setMessages(prev => prev.filter(msg => msg.id.startsWith('temp-')));
+      alert('An error occurred while sending your message.');
+    } finally {
+      setIsTyping(false);
     }
   }
 
   function handleNewChat() {
-    // Create a new chat and switch to it
-    const newChatId = `chat-${Date.now()}`;
-    const newChat = {
-      id: newChatId,
-      topic: "New Chat",
-      messages: [],
-      created: Date.now(),
-    };
-    setChats((prev) => [newChat, ...prev]);
-    setCurrentChatId(newChatId);
+    // Clear current chat and prepare for new one
+    setCurrentChatId(null);
     setMessages([]);
     setUploadedPreview(null);
     setSelectedTools([]);
+    setIsSidebarOpen(false);
   }
 
-  function handleSelectChat(chatId) {
-    setCurrentChatId(chatId);
+  async function handleSelectChat(chatId) {
+    if (chatId === currentChatId) {
+      setIsSidebarOpen(false);
+      return;
+    }
+    
+    await loadChatMessages(chatId);
     setUploadedPreview(null);
     setSelectedTools([]);
+    setIsSidebarOpen(false);
   }
 
   function openDeleteModal(chatId) {
@@ -286,32 +443,42 @@ function ChatContent() {
     setDeleteModal({ open: false, chatId: null });
   }
 
-  function confirmDeleteChat() {
+  async function confirmDeleteChat() {
     const chatId = deleteModal.chatId;
-    const updatedChats = chats.filter((c) => c.id !== chatId);
-    setChats(updatedChats);
-    if (currentChatId === chatId) {
-      // If deleted current chat, switch to first available
-      const nextChat = updatedChats[0];
-      if (nextChat) {
-        setCurrentChatId(nextChat.id);
-        setMessages(nextChat.messages);
-      } else {
-        setCurrentChatId(null);
-        setMessages([]);
-        // If no chats left, refresh page to reset state
-        if (typeof window !== 'undefined') {
-          setTimeout(() => {
-            window.location.reload();
-          }, 300);
+    
+    try {
+      const response = await fetch(`/api/chats?chatId=${chatId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // Remove chat from list
+        const updatedChats = chats.filter((c) => c.id !== chatId);
+        setChats(updatedChats);
+        
+        if (currentChatId === chatId) {
+          // If deleted current chat, switch to first available or clear
+          if (updatedChats.length > 0) {
+            await loadChatMessages(updatedChats[0].id);
+          } else {
+            setCurrentChatId(null);
+            setMessages([]);
+          }
         }
+      } else {
+        alert('Failed to delete chat. Please try again.');
       }
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+      alert('An error occurred while deleting the chat.');
     }
+    
     closeDeleteModal();
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex relative overflow-hidden">
+    // FIX 1: Replaced h-screen with h-[100dvh] for accurate viewport height on mobile.
+    <div className="h-[100dvh] bg-gray-50 flex relative overflow-hidden">
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div 
@@ -376,44 +543,45 @@ function ChatContent() {
                 style={{ transition: 'background 0.2s' }}
               >
                 <div className="flex-1 truncate">
-                  <span className="text-sm text-gray-800 font-medium truncate">{chat.topic || 'New Chat'}</span>
+                  <span className="text-sm text-gray-800 font-medium truncate">{chat.title || 'New Chat'}</span>
+                  <div className="text-xs text-gray-500 truncate mt-1">{chat.lastMessage}</div>
                 </div>
                 <button
-                  className="ml-2 p-1 rounded hover:bg-gray-200 text-gray-500"
+                  className="ml-2 p-1 rounded hover:bg-gray-200 text-gray-500 opacity-0 group-hover:opacity-100"
                   title="Delete chat"
                   onClick={e => { e.stopPropagation(); openDeleteModal(chat.id); }}
                 >
                   <MdDelete size={16} />
                 </button>
-      {/* Delete Confirmation Modal */}
-      {deleteModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-sm border border-gray-200 animate-fadeIn">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="bg-red-100 text-red-600 rounded-full p-2">
-                <FiX size={22} />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">Delete Chat?</h3>
-            </div>
-            <p className="text-gray-600 mb-6 text-sm">Are you sure you want to delete this chat? This action cannot be undone.</p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={closeDeleteModal}
-                className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDeleteChat}
-                className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 shadow"
-                autoFocus
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              {/* Delete Confirmation Modal */}
+              {deleteModal.open && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                  <div className="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-sm border border-gray-200 animate-fadeIn">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="bg-red-100 text-red-600 rounded-full p-2">
+                        <FiX size={22} />
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-900">Delete Chat?</h3>
+                    </div>
+                    <p className="text-gray-600 mb-6 text-sm">Are you sure you want to delete this chat? This action cannot be undone.</p>
+                    <div className="flex justify-end gap-3">
+                      <button
+                        onClick={closeDeleteModal}
+                        className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={confirmDeleteChat}
+                        className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 shadow"
+                        autoFocus
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
               </div>
             ))}
           </div>
@@ -457,17 +625,13 @@ function ChatContent() {
               title="View Profile"
             >
               {session?.user?.image ? (
-                <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 group-hover:border-blue-500 transition-colors">
-                  <Image
+                <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 group-hover:border-blue-500 transition-colors bg-gray-100">
+                  <img
                     src={session.user.image}
                     alt={session.user.name || "User"}
-                    width={40}
-                    height={40}
                     className="w-full h-full object-cover"
-                    unoptimized={session.user.image.startsWith('http')}
-                    onError={(e) => {
-                      e.currentTarget.src = '/logo.png';
-                    }}
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
                   />
                 </div>
               ) : (
@@ -487,19 +651,72 @@ function ChatContent() {
         >
           {messages.map((m) => (
             <div key={m.id} className="animate-fadeIn">
-              <ChatMessage msg={m} />
+              <ChatMessage msg={{
+                role: m.role,
+                text: m.content,
+                image: m.image?.url,
+                id: m.id
+              }} />
             </div>
           ))}
+          
+          {/* Typing Animation */}
+          {isTyping && (
+            <div ref={typingRef} className="animate-fadeIn">
+              <div className="flex items-start space-x-3 mb-4">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-600 ai-avatar-typing flex items-center justify-center flex-shrink-0 shadow-lg">
+                  <svg className="w-4 h-4 text-white animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                </div>
+                <div className="flex-1 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-2xl px-4 py-4 shadow-sm border border-gray-200 dark:border-gray-600">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full typing-dot"></div>
+                      <div className="w-2 h-2 bg-purple-500 rounded-full typing-dot"></div>
+                      <div className="w-2 h-2 bg-indigo-500 rounded-full typing-dot"></div>
+                    </div>
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300">BharatAI is thinking...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Tools and Upload Preview */}
         <div className="px-4 sm:px-6 flex-shrink-0 pb-2">
           <ToolSelector
-            selected={selectedTools}
+            selected={isImageGenMode ? ["image-gen"] : selectedTools}
             onToggle={toggleTool}
             onUploadClick={handleUploadClick}
             onRemove={removeTool}
+            onExitImageGen={exitImageGenMode}
           />
+
+          {/* Image Generation Mode Indicator */}
+          {isImageGenMode && (
+            <div className="mt-3 p-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium text-purple-700">
+                    🎨 Image Generation Mode Active
+                  </span>
+                </div>
+                {/* <button
+                  onClick={exitImageGenMode}
+                  className="text-purple-400 hover:text-purple-600 hover:bg-purple-100 rounded-full p-1 transition-colors"
+                  title="Exit Image Generation Mode"
+                >
+                  <FiX size={16} />
+                </button> */}
+              </div>
+              <p className="text-xs text-purple-600 mt-1">
+                Type your image description in the message box below
+              </p>
+            </div>
+          )}
 
           {uploadedPreview && (
             <div className="mt-4 flex items-start gap-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
@@ -524,89 +741,76 @@ function ChatContent() {
           )}
         </div>
 
-        {/* Input Area */}
-        <div 
-          className="flex-shrink-0 sticky bottom-0 left-0 right-0"
-          style={{
-            background: 'rgba(255,255,255,0.95)',
-            boxShadow: '0 -2px 16px rgba(0,0,0,0.04)',
-            borderTop: '1px solid #e5e7eb',
-            padding: '8px 0',
-            backdropFilter: 'blur(8px)',
-          }}
-        >
-          {/* Desktop Input */}
-          <div className="hidden sm:flex items-end gap-4 px-6 pb-4">
-            <div className="flex-1 min-w-0">
-              <div className="bg-gray-50 rounded-2xl border border-gray-200 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  placeholder="Type your message..."
-                  rows={1}
-                  className="w-full border-0 bg-transparent px-4 py-3 focus:outline-none resize-none text-gray-700 placeholder-gray-500"
-                  style={{
-                    minHeight: '44px',
-                    maxHeight: '120px',
-                  }}
-                />
-              </div>
+        {/* FIX 2: REFACTORED INPUT AREA */}
+        {/* This entire block is updated for reliable positioning and a unified UI. */}
+        <div className="flex-shrink-0 bg-white/95 backdrop-blur-sm border-t border-gray-200">
+            <div className="px-4 sm:px-6 py-2 sm:py-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:pb-3">
+                <div className="flex items-end gap-3">
+                    <div className="flex-1 min-w-0">
+                        <div className="bg-gray-100 rounded-2xl border border-gray-200 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                            <textarea
+                                value={message}
+                                onChange={(e) => setMessage(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" && !e.shiftKey && !isTyping) {
+                                        e.preventDefault();
+                                        handleSend();
+                                    }
+                                }}
+                                onFocus={(e) => {
+                                    // Smooth scroll into view for mobile keyboard
+                                    if (window.innerWidth < 640) {
+                                        setTimeout(() => {
+                                            e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                        }, 300);
+                                    }
+                                }}
+                                disabled={isTyping}
+                                placeholder={
+                                  isTyping 
+                                    ? "AI is responding..." 
+                                    : isImageGenMode 
+                                      ? "🎨 Describe the image you want to generate..."
+                                      : "Message Bharat AI..."
+                                }
+                                rows={1}
+                                className={`w-full border-0 bg-transparent px-4 py-3 focus:outline-none resize-none text-gray-800 placeholder-gray-500 ${isTyping ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                style={{
+                                    minHeight: '48px',
+                                    maxHeight: '150px',
+                                }}
+                            />
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleSend}
+                        disabled={(!message.trim() && !uploadedPreview) || isTyping}
+                        className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 group flex-shrink-0"
+                        title={
+                            isTyping 
+                                ? "AI is responding..." 
+                                : isImageGenMode 
+                                    ? "Generate image"
+                                    : "Send message"
+                        }
+                    >
+                        {isTyping ? (
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : isImageGenMode ? (
+                            <div className="flex items-center gap-1">
+                                <span className="text-sm">🎨</span>
+                            </div>
+                        ) : (
+                            <FiSend size={20} className="group-hover:translate-x-0.5 transition-transform" />
+                        )}
+                    </button>
+                </div>
             </div>
-            <button
-              onClick={handleSend}
-              disabled={!message.trim() && !uploadedPreview}
-              className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 group flex-shrink-0"
-              title="Send message"
-            >
-              <FiSend size={20} className="group-hover:translate-x-0.5 transition-transform" />
-            </button>
-          </div>
-
-          {/* Mobile Input - Same styling as landing page */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200 p-2 mx-2 sm:hidden">
-            <div className="flex items-center gap-3">
-              <div className="flex-1 relative">
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  onFocus={(e) => {
-                    setTimeout(() => {
-                      e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    }, 300);
-                  }}
-                  placeholder="Message Bharat AI..."
-                  rows={1}
-                  className="w-full border-0 rounded-xl px-4 py-4 focus:outline-none text-gray-700 placeholder-gray-500 text-lg bg-transparent resize-none"
-                  style={{
-                    minHeight: '44px',
-                    maxHeight: '100px',
-                  }}
-                />
-              </div>
-              <button
-                onClick={handleSend}
-                disabled={!message.trim() && !uploadedPreview}
-                className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 group"
-                title="Send message"
-              >
-                <FiSend size={20} className="group-hover:translate-x-0.5 transition-transform" />
-              </button>
-            </div>
-          </div>
         </div>
+
       </div>
+
+
 
       {/* Hidden file input */}
       <input

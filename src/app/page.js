@@ -12,6 +12,7 @@ export default function Home() {
   // ALL HOOKS MUST BE AT THE TOP - Before any conditional returns
   const [message, setMessage] = useState("");
   const [uploadedPreview, setUploadedPreview] = useState(null);
+  const [hasExistingChats, setHasExistingChats] = useState(false);
   const fileRef = useRef(null);
   
   // Redirect to login if not authenticated
@@ -20,6 +21,35 @@ export default function Home() {
       router.push("/login");
     }
   }, [status, router]);
+
+  // Auto-redirect users with existing chats to chat page (like ChatGPT)
+  useEffect(() => {
+    const checkExistingChats = async () => {
+      if (session?.user) {
+        try {
+          const response = await fetch('/api/chats');
+          if (response.ok) {
+            const data = await response.json();
+            // If user has existing chats, set state and redirect
+            if (data.chats && data.chats.length > 0) {
+              setHasExistingChats(true);
+              // Redirect after a short delay to allow user to see the option
+              setTimeout(() => {
+                router.push('/chat');
+              }, 2000);
+            }
+          }
+        } catch (error) {
+          console.error('Error checking existing chats:', error);
+          // Don't redirect on error, let user stay on home page
+        }
+      }
+    };
+
+    // Add a small delay to prevent flash  
+    const timer = setTimeout(checkExistingChats, 500);
+    return () => clearTimeout(timer);
+  }, [session, router]);
   
   // Show loading state while checking authentication
   if (status === "loading") {
@@ -102,6 +132,30 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 relative z-10 pb-32 sm:pb-0">
+        
+        {/* Existing Chats Notification */}
+        {hasExistingChats && (
+          <div className="w-full max-w-2xl mb-8">
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <FiMessageSquare className="text-blue-600" size={20} />
+                  <div>
+                    <p className="text-blue-800 font-medium">Welcome back!</p>
+                    <p className="text-blue-600 text-sm">Continue your previous conversations or start a new one.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => router.push('/chat')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                >
+                  Continue Chat
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Logo and Branding */}
         <div className="text-center mb-12">
           <div className="flex justify-center mt-5 mb-6">

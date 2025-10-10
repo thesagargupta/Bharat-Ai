@@ -7,12 +7,12 @@ export default function ToolSelector({
   onToggle,
   onUploadClick,
   onRemove,
+  onExitImageGen,
 }) {
   const tools = [
     { id: "image-gen", label: "Generate Image", icon: <FiImage /> },
     { id: "upload", label: "Upload Image", icon: <FiUpload /> },
   ];
-
   return (
     <div className="w-full">
       {/* Tools Row */}
@@ -51,7 +51,17 @@ export default function ToolSelector({
               className="flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-sm"
             >
               <span className="text-sm">{label}</span>
-              <button onClick={() => onRemove(s)} className="p-1 rounded-full hover:bg-indigo-100">
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (s === "image-gen" && onExitImageGen) {
+                    onExitImageGen();
+                  } else {
+                    onRemove(s);
+                  }
+                }} 
+                className="p-1 rounded-full hover:bg-indigo-100"
+              >
                 <FiX />
               </button>
             </div>
