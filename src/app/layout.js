@@ -2,6 +2,7 @@ import React, { Suspense } from 'react'
 import './globals.css'
 import TopLoadingBar from '../../components/TopLoadingBar'
 import AuthProvider from '../../components/AuthProvider'
+import { Toaster } from 'react-hot-toast'
 
 export const metadata = {
   metadataBase: new URL('https://thebharatai.vercel.app'),
@@ -102,6 +103,56 @@ export default function RootLayout({ children }) {
             <TopLoadingBar />
           </Suspense>
           {children}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#fff',
+                color: '#333',
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                fontFamily: 'inherit',
+                fontSize: '14px',
+                padding: '12px 16px',
+                maxWidth: '400px',
+              },
+              success: {
+                style: {
+                  background: '#f0fdf4',
+                  color: '#166534',
+                  border: '1px solid #bbf7d0',
+                },
+                iconTheme: {
+                  primary: '#22c55e',
+                  secondary: '#f0fdf4',
+                },
+              },
+              error: {
+                style: {
+                  background: '#fef2f2',
+                  color: '#dc2626',
+                  border: '1px solid #fecaca',
+                },
+                iconTheme: {
+                  primary: '#ef4444',
+                  secondary: '#fef2f2',
+                },
+              },
+              loading: {
+                style: {
+                  background: '#fef3c7',
+                  color: '#d97706',
+                  border: '1px solid #fde68a',
+                },
+                iconTheme: {
+                  primary: '#f59e0b',
+                  secondary: '#fef3c7',
+                },
+              },
+            }}
+          />
         </AuthProvider>
       </body>
     </html>

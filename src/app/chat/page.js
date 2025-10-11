@@ -6,8 +6,10 @@ import { MdDelete } from "react-icons/md";
 import { BiMenuAltLeft } from "react-icons/bi";
 import Image from "next/image";
 import { FiSend, FiX, FiMessageSquare, FiSettings, FiUser, FiUpload, FiImage } from "react-icons/fi";
+import { errorToast, confirmToast } from '../../../lib/toast';
 import ToolSelector from "../../../components/ToolSelector";
 import ChatMessage from "../../../components/ChatMessage";
+import ImageModal from "../../../components/ImageModal";
 
 function ChatContent() {
   // Modal state for delete confirmation
@@ -27,6 +29,8 @@ function ChatContent() {
   const [isLoadingChats, setIsLoadingChats] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
   const [isImageGenMode, setIsImageGenMode] = useState(false);
+  const [isProcessingInitialMessage, setIsProcessingInitialMessage] = useState(false);
+  const [imageModal, setImageModal] = useState({ isOpen: false, imageUrl: null });
 
   const fileRef = useRef(null);
   const scrollRef = useRef(null);
@@ -99,23 +103,66 @@ function ChatContent() {
           return [...withoutTemp, tempUserMessage, aiResponse];
         });
 
-        // Save to database if we have a current chat
-        if (currentChatId) {
-          try {
-            await fetch('/api/chats', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                message: `🎨 Generate image: ${prompt}`,
-                chatId: currentChatId,
-                generatedImage: data.image.url,
-              }),
+        // Save image generation to chat database
+        try {
+          const chatResponse = await fetch('/api/chats', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: `🎨 Generate image: ${prompt}`,
+              chatId: currentChatId,
+              generatedImageUrl: data.image.url,
+            }),
+          });
+
+          if (chatResponse.ok) {
+            const chatData = await chatResponse.json();
+            
+            // Update messages with real database IDs - the image should already be in the response
+            setMessages(prev => {
+              const withoutTemp = prev.filter(msg => msg.id !== tempUserMessage.id);
+              // Add user message and AI response with proper IDs
+              const userMsg = {
+                ...chatData.userMessage,
+                content: `🎨 Generate image: ${prompt}`
+              };
+              const aiMsg = {
+                ...chatData.assistantMessage,
+                content: `I've generated an image based on your prompt: "${prompt}"`,
+                // The image should already be included from the API response
+              };
+              return [...withoutTemp, userMsg, aiMsg];
             });
-          } catch (saveError) {
-            console.error('Error saving to database:', saveError);
+
+            // Update chat list
+            if (chatData.isNewChat) {
+              const newChat = {
+                id: chatData.chatId,
+                title: chatData.chatTitle,
+                messageCount: 2,
+                lastMessage: `Generated image: ${prompt.slice(0, 50)}...`,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              };
+              setChats(prev => [newChat, ...prev]);
+              setCurrentChatId(chatData.chatId);
+            } else {
+              setChats(prev => prev.map(chat => 
+                chat.id === currentChatId 
+                  ? {
+                      ...chat,
+                      messageCount: chat.messageCount + 2,
+                      lastMessage: `Generated image: ${prompt.slice(0, 50)}...`,
+                      updatedAt: new Date(),
+                    }
+                  : chat
+              ));
+            }
           }
+        } catch (saveError) {
+          console.error('Error saving to chat:', saveError);
         }
 
         // Exit image generation mode
@@ -125,14 +172,14 @@ function ChatContent() {
         const errorData = await response.json();
         // Remove temp message and show error
         setMessages(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
-        alert(errorData.error || 'Failed to generate image');
+        errorToast(errorData.error || 'Failed to generate image');
       }
 
     } catch (error) {
       console.error('Error generating image:', error);
       // Remove temp message on error
       setMessages(prev => prev.filter(msg => msg.id.startsWith('temp-')));
-      alert('An error occurred while generating the image.');
+      errorToast('An error occurred while generating the image.');
     } finally {
       setIsTyping(false);
     }
@@ -175,6 +222,18 @@ function ChatContent() {
       const initialMessage = searchParams.get('message');
       if (initialMessage && !isLoadingChats) {
         hasInitialized.current = true;
+        setIsProcessingInitialMessage(true);
+        
+        // Show user message immediately for instant feedback
+        const tempUserMessage = {
+          id: `temp-user-${Date.now()}`,
+          role: "user",
+          content: initialMessage,
+          timestamp: new Date(),
+        };
+        
+        setMessages([tempUserMessage]);
+        setIsTyping(true);
         
         try {
           // Send message to create new chat with AI response
@@ -203,10 +262,20 @@ function ChatContent() {
             
             setChats(prev => [newChat, ...prev]);
             setCurrentChatId(data.chatId);
+            // Replace temp message with real messages
             setMessages([data.userMessage, data.assistantMessage]);
+          } else {
+            // Remove temp message on error
+            setMessages([]);
+            console.error('Error sending initial message');
           }
         } catch (error) {
           console.error('Error sending initial message:', error);
+          // Remove temp message on error
+          setMessages([]);
+        } finally {
+          setIsTyping(false);
+          setIsProcessingInitialMessage(false);
         }
 
         // Remove message param from URL
@@ -308,6 +377,20 @@ function ChatContent() {
     setMessage('');
   }
 
+  // Handle image click for full view
+  const handleImageClick = (imageUrl) => {
+    console.log('Opening image modal with URL:', imageUrl);
+    setImageModal({
+      isOpen: true,
+      imageUrl
+    });
+  };
+
+  // Close image modal
+  const closeImageModal = () => {
+    setImageModal({ isOpen: false, imageUrl: null });
+  };
+
   async function handleSend() {
     if (!message.trim() && !uploadedPreview) return;
 
@@ -402,13 +485,13 @@ function ChatContent() {
       } else {
         // Remove temp message on error
         setMessages(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
-        alert('Failed to send message. Please try again.');
+        errorToast('Failed to send message. Please try again.');
       }
     } catch (error) {
       console.error('Error sending message:', error);
       // Remove temp message on error
       setMessages(prev => prev.filter(msg => msg.id.startsWith('temp-')));
-      alert('An error occurred while sending your message.');
+      errorToast('An error occurred while sending your message.');
     } finally {
       setIsTyping(false);
     }
@@ -466,11 +549,11 @@ function ChatContent() {
           }
         }
       } else {
-        alert('Failed to delete chat. Please try again.');
+        errorToast('Failed to delete chat. Please try again.');
       }
     } catch (error) {
       console.error('Error deleting chat:', error);
-      alert('An error occurred while deleting the chat.');
+      errorToast('An error occurred while deleting the chat.');
     }
     
     closeDeleteModal();
@@ -601,6 +684,30 @@ function ChatContent() {
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col w-full lg:w-auto h-full min-h-0">
+        
+        {/* Initial Loading Screen */}
+        {isProcessingInitialMessage && messages.length === 1 && (
+          <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-30 flex items-center justify-center">
+            <div className="text-center max-w-md mx-auto px-6">
+              <div className="relative mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mx-auto flex items-center justify-center animate-pulse">
+                  <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                </div>
+                <div className="absolute inset-0 w-16 h-16 border-4 border-blue-200 rounded-full mx-auto animate-spin border-t-transparent"></div>
+              </div>
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">Setting up your chat...</h2>
+              <p className="text-gray-600 mb-4">BharatAI is processing your message and preparing a response.</p>
+              <div className="flex justify-center space-x-1">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Chat Header */}
         <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -651,12 +758,15 @@ function ChatContent() {
         >
           {messages.map((m) => (
             <div key={m.id} className="animate-fadeIn">
-              <ChatMessage msg={{
-                role: m.role,
-                text: m.content,
-                image: m.image?.url,
-                id: m.id
-              }} />
+              <ChatMessage 
+                msg={{
+                  role: m.role,
+                  text: m.content,
+                  image: m.image, // Pass full image object instead of just URL
+                  id: m.id
+                }} 
+                onImageClick={handleImageClick}
+              />
             </div>
           ))}
           
@@ -704,13 +814,6 @@ function ChatContent() {
                     🎨 Image Generation Mode Active
                   </span>
                 </div>
-                {/* <button
-                  onClick={exitImageGenMode}
-                  className="text-purple-400 hover:text-purple-600 hover:bg-purple-100 rounded-full p-1 transition-colors"
-                  title="Exit Image Generation Mode"
-                >
-                  <FiX size={16} />
-                </button> */}
               </div>
               <p className="text-xs text-purple-600 mt-1">
                 Type your image description in the message box below
@@ -819,6 +922,14 @@ function ChatContent() {
         accept="image/*"
         className="hidden"
         onChange={handleFile}
+      />
+
+      {/* Image Modal */}
+      {console.log('Modal state:', imageModal)}
+      <ImageModal
+        isOpen={imageModal.isOpen}
+        onClose={closeImageModal}
+        imageUrl={imageModal.imageUrl}
       />
     </div>
   );

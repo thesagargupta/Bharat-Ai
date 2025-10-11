@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import Image from "next/image";
-import { FiUser, FiCpu, FiCopy, FiCheck } from "react-icons/fi";
+import { FiUser, FiCpu, FiCopy, FiCheck, FiDownload } from "react-icons/fi";
 
 // Enhanced text processing function
 const processText = (text) => {
@@ -86,7 +86,7 @@ const CodeBlock = ({ language, content }) => {
   );
 };
 
-export default function ChatMessage({ msg }) {
+export default function ChatMessage({ msg, onImageClick }) {
   const isUser = msg.role === "user";
   const textParts = processText(msg.text);
   return (
@@ -133,11 +133,54 @@ export default function ChatMessage({ msg }) {
             )}
             {msg.image && (
               <div className="mt-3">
-                <img
-                  src={msg.image}
-                  alt="attached"
-                  className="w-full max-w-md max-h-64 object-cover rounded-xl border shadow-sm"
-                />
+                <div className="relative inline-block group">
+                  <img
+                    src={typeof msg.image === 'string' ? msg.image : msg.image?.url}
+                    alt="Generated or attached image"
+                    className="w-full max-w-md max-h-64 object-cover rounded-xl border shadow-sm cursor-pointer hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const imageUrl = typeof msg.image === 'string' ? msg.image : msg.image?.url;
+                      console.log('Image clicked, URL:', imageUrl);
+                      // Image click handled by parent component
+                      if (imageUrl && onImageClick) {
+                        onImageClick(imageUrl);
+                      }
+                    }}
+                  />
+                  {/* Click indicator overlay */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-xl transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium text-gray-700 shadow-lg">
+                      Click to view full size
+                    </div>
+                  </div>
+                  
+                  {/* Download button overlay */}
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const imageUrl = typeof msg.image === 'string' ? msg.image : msg.image?.url;
+                        if (imageUrl) {
+                          // Create download link
+                          const link = document.createElement('a');
+                          link.href = imageUrl;
+                          link.download = `bharat-ai-image-${Date.now()}.png`;
+                          link.target = '_blank';
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }
+                      }}
+                      className="bg-black/70 hover:bg-black/90 text-white p-2 rounded-full backdrop-blur-sm transition-all duration-200 shadow-lg"
+                      title="Download image"
+                    >
+                      <FiDownload size={16} />
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

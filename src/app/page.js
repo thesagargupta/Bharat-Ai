@@ -13,6 +13,7 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [uploadedPreview, setUploadedPreview] = useState(null);
   const [hasExistingChats, setHasExistingChats] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const fileRef = useRef(null);
   
   // Redirect to login if not authenticated
@@ -83,6 +84,8 @@ export default function Home() {
   function handleSend() {
     if (!message.trim() && !uploadedPreview) return;
     
+    setIsSending(true);
+    
     // Navigate to chat page with the message
     const queryParams = new URLSearchParams();
     if (message.trim()) queryParams.set('message', message.trim());
@@ -129,6 +132,22 @@ export default function Home() {
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-100 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse animation-delay-2000"></div>
         </div>
+
+        {/* Loading Overlay */}
+        {isSending && (
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full mx-auto flex items-center justify-center mb-4 animate-pulse">
+                <svg className="w-8 h-8 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">Starting your chat...</h2>
+              <p className="text-gray-600">Taking you to BharatAI chat interface</p>
+            </div>
+          </div>
+        )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 relative z-10 pb-32 sm:pb-0">
@@ -219,11 +238,15 @@ export default function Home() {
               </button>
               <button
                 onClick={handleSend}
-                disabled={!message.trim()}
+                disabled={!message.trim() || isSending}
                 className="p-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 group"
-                title="Send message"
+                title={isSending ? "Starting chat..." : "Send message"}
               >
-                <FiSend size={20} className="group-hover:translate-x-0.5 transition-transform" />
+                {isSending ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <FiSend size={20} className="group-hover:translate-x-0.5 transition-transform" />
+                )}
               </button>
             </div>
           </div>
@@ -291,11 +314,15 @@ export default function Home() {
             </button>
             <button
               onClick={handleSend}
-              disabled={!message.trim()}
+              disabled={!message.trim() || isSending}
               className="p-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 group"
-              title="Send message"
+              title={isSending ? "Starting chat..." : "Send message"}
             >
-              <FiSend size={20} className="group-hover:translate-x-0.5 transition-transform" />
+              {isSending ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <FiSend size={20} className="group-hover:translate-x-0.5 transition-transform" />
+              )}
             </button>
           </div>
         </div>

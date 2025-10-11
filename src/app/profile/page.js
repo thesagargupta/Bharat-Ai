@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import { FiArrowLeft, FiUser, FiMail, FiCalendar, FiEdit2, FiCamera, FiLogOut, FiX } from "react-icons/fi";
+import { successToast, errorToast, warningToast, confirmToast } from '../../../lib/toast';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -18,7 +19,9 @@ export default function ProfilePage() {
   
   const [isEditing, setIsEditing] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false); // Changed from isUploading for clarity
+  
+  // State for the saved profile data
   const [profile, setProfile] = useState({
     name: session?.user?.name || "User",
     email: session?.user?.email || "",
@@ -32,8 +35,13 @@ export default function ProfilePage() {
     }
   });
 
+  // State for the form while editing
   const [editForm, setEditForm] = useState({ ...profile });
   
+  // --- NEW STATE FOR STAGING IMAGE UPLOAD ---
+  const [imagePreview, setImagePreview] = useState(null); // Local URL for preview
+  const [imageFile, setImageFile] = useState(null);       // The actual file object for upload
+
   // Load profile data from database
   useEffect(() => {
     const loadProfile = async () => {
@@ -53,7 +61,6 @@ export default function ProfilePage() {
             setProfile(updatedProfile);
             setEditForm(updatedProfile);
           } else {
-            // Fallback to session data
             const fallbackProfile = {
               name: session.user.name || "User",
               email: session.user.email || "",
@@ -74,114 +81,134 @@ export default function ProfilePage() {
     loadProfile();
   }, [session]);
 
+  // Cleanup for the local image preview URL
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
+
+
   const handleSave = async () => {
+    setIsSaving(true);
     try {
-      const response = await fetch('/api/user/profile', {
+      // First, update the profile text fields
+      const profileResponse = await fetch('/api/user/profile', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: editForm.name,
-          bio: editForm.bio,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editForm.name, bio: editForm.bio }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const updatedProfile = {
-          ...profile,
-          name: data.user.name,
-          bio: data.user.bio,
-        };
-        setProfile(updatedProfile);
-        setEditForm(updatedProfile);
-        setIsEditing(false);
-      } else {
-        alert('Failed to update profile. Please try again.');
+      if (!profileResponse.ok) {
+        throw new Error('Failed to update profile information.');
       }
+
+      const profileData = await profileResponse.json();
+      let updatedProfile = { ...profile, name: profileData.user.name, bio: profileData.user.bio };
+
+      // If there's a new image file, upload it separately
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append('image', imageFile);
+
+        const imageResponse = await fetch('/api/user/profile', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!imageResponse.ok) {
+          throw new Error('Failed to upload profile image.');
+        }
+
+        const imageData = await imageResponse.json();
+        updatedProfile = { ...updatedProfile, image: imageData.imageUrl };
+      }
+
+      // Update the state with the final profile data
+      setProfile(updatedProfile);
+      setEditForm(updatedProfile);
+
+      // Reset staging states after successful save
+      setImageFile(null);
+      setImagePreview(null);
+      setIsEditing(false);
+
+      successToast('Profile updated successfully!');
+
     } catch (error) {
       console.error('Error updating profile:', error);
-      alert('An error occurred while updating your profile.');
+      errorToast(error.message || 'An error occurred while updating your profile.');
+    } finally {
+      setIsSaving(false);
     }
   };
-
+  
   const handleCancel = () => {
     setEditForm({ ...profile });
+    // Also reset the staged image
+    setImageFile(null);
+    setImagePreview(null);
     setIsEditing(false);
   };
 
-  const handleImageUpload = async (event) => {
+  const handleImageUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file.');
-      return;
+        warningToast('Please select an image file.');
+        return;
     }
-
-    // Validate file size (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image must be less than 5MB.');
-      return;
+        warningToast('Image must be less than 5MB.');
+        return;
     }
 
-    setIsUploading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
-
-      const response = await fetch('/api/user/profile', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const updatedProfile = {
-          ...profile,
-          avatar: data.imageUrl,
-        };
-        setProfile(updatedProfile);
-        setEditForm(updatedProfile);
-      } else {
-        const errorData = await response.json();
-        alert(errorData.error || 'Failed to upload image.');
-      }
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      alert('An error occurred while uploading the image.');
-    } finally {
-      setIsUploading(false);
+    // Revoke the old preview URL if it exists
+    if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
     }
+
+    // Set the new file and create a preview URL for it
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
   };
 
+
   const handleDeleteImage = async () => {
-    if (!window.confirm('Are you sure you want to delete your profile picture?')) {
-      return;
-    }
+    const confirmed = await confirmToast(
+      'Are you sure you want to delete your profile picture?',
+      async () => {
+        setIsSaving(true);
+        try {
+          const response = await fetch('/api/user/profile', {
+            method: 'DELETE',
+          });
 
-    try {
-      const response = await fetch('/api/user/profile', {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        const updatedProfile = {
-          ...profile,
-          avatar: session?.user?.image || "/logo.png",
-        };
-        setProfile(updatedProfile);
-        setEditForm(updatedProfile);
-      } else {
-        alert('Failed to delete profile picture.');
+          if (response.ok) {
+            const updatedProfile = {
+              ...profile,
+              avatar: session?.user?.image || "/logo.png",
+            };
+            setProfile(updatedProfile);
+            setEditForm(updatedProfile);
+            // Ensure any local preview is also cleared
+            setImageFile(null);
+            setImagePreview(null);
+            successToast('Profile picture deleted successfully!');
+          } else {
+            errorToast('Failed to delete profile picture.');
+          }
+        } catch (error) {
+          console.error('Error deleting image:', error);
+          errorToast('An error occurred while deleting the image.');
+        } finally {
+          setIsSaving(false);
+        }
       }
-    } catch (error) {
-      console.error('Error deleting image:', error);
-      alert('An error occurred while deleting the image.');
-    }
+    );
   };
   
   const handleSignOut = async () => {
@@ -189,7 +216,6 @@ export default function ProfilePage() {
     await signOut({ callbackUrl: '/login' });
   };
   
-  // Show loading state while checking authentication or signing out
   if (status === "loading" || isSigningOut) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
@@ -203,7 +229,6 @@ export default function ProfilePage() {
     );
   }
   
-  // Don't render content until authenticated
   if (status === "unauthenticated") {
     return null;
   }
@@ -266,17 +291,17 @@ export default function ProfilePage() {
 
           {/* Profile Info */}
           <div className="px-6 sm:px-8 pb-8">
-            {/* Avatar */}
-            <div className="relative -mt-16 mb-4">
+            <div className="-mt-16 mb-4 flex flex-col items-center sm:items-start">
               <div className="relative inline-block">
                 <div className="w-32 h-32 rounded-full border-4 border-white shadow-xl bg-white overflow-hidden">
-                  {isUploading ? (
+                  {isSaving && !isSigningOut ? (
                     <div className="w-full h-full flex items-center justify-center bg-gray-100">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     </div>
                   ) : (
                     <img
-                      src={profile.avatar}
+                      // The image source is now the preview OR the saved profile avatar
+                      src={imagePreview || profile.avatar}
                       alt={`${profile.name}'s profile picture`}
                       className="w-full h-full object-cover"
                       onError={(e) => {
@@ -285,28 +310,34 @@ export default function ProfilePage() {
                     />
                   )}
                 </div>
-                <div className="absolute bottom-2 right-2 flex gap-1">
-                  <label className="p-2 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-colors cursor-pointer">
+              </div>
+
+              {isEditing && (
+                <div className="flex items-center gap-3 mt-4">
+                  <label className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer shadow">
                     <FiCamera size={16} />
+                    <span>Upload</span>
                     <input
                       type="file"
                       accept="image/*"
                       onChange={handleImageUpload}
                       className="hidden"
-                      disabled={isUploading}
+                      disabled={isSaving}
                     />
                   </label>
-                  {profile.avatar !== (session?.user?.image || "/logo.png") && (
+                  {profile.avatar !== (session?.user?.image || "/logo.png") && !imagePreview && (
                     <button
                       onClick={handleDeleteImage}
-                      className="p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-colors"
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-red-600 bg-red-100 rounded-lg hover:bg-red-200 transition-colors"
                       title="Delete custom image"
+                      disabled={isSaving}
                     >
                       <FiX size={16} />
+                      <span>Remove</span>
                     </button>
                   )}
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Edit Button */}
@@ -314,7 +345,7 @@ export default function ProfilePage() {
               {!isEditing ? (
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-xl hover:bg-blue-600 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors shadow"
                 >
                   <FiEdit2 size={18} />
                   <span>Edit Profile</span>
@@ -324,14 +355,17 @@ export default function ProfilePage() {
                   <button
                     onClick={handleCancel}
                     className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+                    disabled={isSaving}
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleSave}
-                    className="px-4 py-2 bg-orange-500 text-white rounded-xl hover:bg-blue-600 transition-colors"
+                    className="px-4 py-2 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors shadow flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                    disabled={isSaving}
                   >
-                    Save Changes
+                    {isSaving && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                    {isSaving ? "Saving..." : "Save Changes"}
                   </button>
                 </div>
               )}
@@ -363,16 +397,7 @@ export default function ProfilePage() {
                   <FiMail size={18} />
                   Email Address
                 </label>
-                {isEditing ? (
-                  <input
-                    type="email"
-                    value={editForm.email}
-                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                ) : (
-                  <p className="text-lg text-gray-900">{profile.email}</p>
-                )}
+                <p className="text-lg text-gray-900">{profile.email}</p>
               </div>
 
               {/* Bio */}

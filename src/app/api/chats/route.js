@@ -59,7 +59,7 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { message, chatId, imageData } = body;
+    const { message, chatId, imageData, generatedImageUrl } = body;
 
     if (!message?.trim() && !imageData) {
       return NextResponse.json({ error: 'Message or image is required' }, { status: 400 });
@@ -152,6 +152,7 @@ export async function POST(request) {
     const assistantMessage = {
       role: 'assistant',
       content: aiResponse.message,
+      image: generatedImageUrl ? { url: generatedImageUrl } : undefined,
       timestamp: new Date(),
     };
 
@@ -184,6 +185,7 @@ export async function POST(request) {
         id: savedAssistantMessage._id.toString(),
         role: savedAssistantMessage.role,
         content: savedAssistantMessage.content,
+        image: savedAssistantMessage.image,
         timestamp: savedAssistantMessage.timestamp,
       },
       chatTitle: chat.title,
