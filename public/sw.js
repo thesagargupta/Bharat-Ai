@@ -1,12 +1,135 @@
-// Service Worker for handling push notifications
+// Service Worker for handling push notifications and PWA functionality
+const CACHE_NAME = 'bharat-ai-v1';
+const STATIC_CACHE = 'bharat-ai-static-v1';
+
+// Resources to cache for offline functionality
+const CACHE_URLS = [
+  '/',
+  '/chat',
+  '/setting',
+  '/profile',
+  '/login',
+  '/logo.png',
+  '/manifest.json',
+  // Add critical CSS and JS files here when needed
+];
+
+// Install event - cache essential resources
 self.addEventListener('install', (event) => {
   console.log('Service Worker installing');
-  self.skipWaiting();
+  
+  event.waitUntil(
+    caches.open(STATIC_CACHE)
+      .then((cache) => {
+        console.log('Caching essential resources');
+        return cache.addAll(CACHE_URLS);
+      })
+      .then(() => {
+        self.skipWaiting();
+      })
+      .catch((error) => {
+        console.error('Error caching resources:', error);
+      })
+  );
 });
 
+// Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
   console.log('Service Worker activating');
-  event.waitUntil(self.clients.claim());
+  
+  event.waitUntil(
+    caches.keys()
+      .then((cacheNames) => {
+        return Promise.all(
+          cacheNames
+            .filter((cacheName) => {
+              return cacheName !== CACHE_NAME && cacheName !== STATIC_CACHE;
+            })
+            .map((cacheName) => {
+              console.log('Deleting old cache:', cacheName);
+              return caches.delete(cacheName);
+            })
+        );
+      })
+      .then(() => {
+        return self.clients.claim();
+      })
+  );
+});
+
+// Fetch event - serve from cache when offline
+self.addEventListener('fetch', (event) => {
+  // Skip non-GET requests and chrome-extension requests
+  if (event.request.method !== 'GET' || event.request.url.startsWith('chrome-extension://')) {
+    return;
+  }
+
+  // Handle API requests with network-first strategy
+  if (event.request.url.includes('/api/')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          return response;
+        })
+        .catch(() => {
+          // Return a custom offline response for API calls
+          return new Response(
+            JSON.stringify({ error: 'You are offline. Please check your internet connection.' }),
+            {
+              status: 503,
+              statusText: 'Service Unavailable',
+              headers: new Headers({
+                'Content-Type': 'application/json',
+              }),
+            }
+          );
+        })
+    );
+    return;
+  }
+
+  // Handle page requests with cache-first strategy
+  event.respondWith(
+    caches.match(event.request)
+      .then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        
+        return fetch(event.request)
+          .then((response) => {
+            // Don't cache non-successful responses
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+
+            // Clone the response for caching
+            const responseToCache = response.clone();
+            
+            // Cache the response
+            caches.open(CACHE_NAME)
+              .then((cache) => {
+                cache.put(event.request, responseToCache);
+              });
+
+            return response;
+          })
+          .catch(() => {
+            // Return offline page if available in cache
+            if (event.request.destination === 'document') {
+              return caches.match('/') || new Response('You are offline', {
+                status: 503,
+                statusText: 'Service Unavailable',
+                headers: new Headers({
+                  'Content-Type': 'text/plain',
+                }),
+              });
+            }
+            
+            throw error;
+          });
+      })
+  );
 });
 
 // Handle push notifications

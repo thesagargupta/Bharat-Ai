@@ -2,6 +2,7 @@ import React, { Suspense } from 'react'
 import './globals.css'
 import TopLoadingBar from '../../components/TopLoadingBar'
 import AuthProvider from '../../components/AuthProvider'
+import PWAInstallPrompt from '../../components/PWAInstallPrompt'
 import { Toaster } from 'react-hot-toast'
 
 export const metadata = {
@@ -90,11 +91,30 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning={true}>
       <head>
-        {/* Additional SEO Tags */}
+        {/* PWA and Mobile App Tags */}
         <meta name="theme-color" content="#ff9933" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Bharat AI" />
         <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="msapplication-TileColor" content="#ff9933" />
+        <meta name="msapplication-tap-highlight" content="no" />
+        
+        {/* PWA Manifest */}
+        <link rel="manifest" href="/manifest.json" />
+        
+        {/* Apple Touch Icons */}
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/logo.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/logo.png" />
+        <link rel="apple-touch-icon" sizes="167x167" href="/logo.png" />
+        
+        {/* Favicon */}
+        <link rel="icon" type="image/png" sizes="32x32" href="/logo.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/logo.png" />
+        <link rel="shortcut icon" href="/logo.png" />
+        
+        {/* Canonical URL */}
         <link rel="canonical" href="https://thebharatai.vercel.app" />
       </head>
       <body>
@@ -103,6 +123,7 @@ export default function RootLayout({ children }) {
             <TopLoadingBar />
           </Suspense>
           {children}
+          <PWAInstallPrompt />
           <Toaster
             position="top-right"
             toastOptions={{
