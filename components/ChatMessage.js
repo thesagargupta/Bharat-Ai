@@ -89,6 +89,27 @@ const CodeBlock = ({ language, content }) => {
 export default function ChatMessage({ msg, onImageClick }) {
   const isUser = msg.role === "user";
   const textParts = processText(msg.text);
+  
+  // Helper function to get valid image URL
+  const getImageUrl = (image) => {
+    if (!image) return null;
+    
+    // If image is a string, return it directly
+    if (typeof image === 'string' && image.trim() !== '') {
+      return image;
+    }
+    
+    // If image is an object with url property
+    if (typeof image === 'object' && image.url && typeof image.url === 'string' && image.url.trim() !== '') {
+      return image.url;
+    }
+    
+    // No valid image URL found
+    return null;
+  };
+  
+  const imageUrl = getImageUrl(msg.image);
+  
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-6`}>
       <div className={`flex items-start gap-3 max-w-[85%] ${isUser ? "flex-row-reverse" : "flex-row"}`}>
@@ -131,20 +152,24 @@ export default function ChatMessage({ msg, onImageClick }) {
                 })}
               </div>
             )}
-            {msg.image && (
+            {imageUrl && (
               <div className="mt-3">
                 <div className="relative inline-block group">
                   <img
-                    src={typeof msg.image === 'string' ? msg.image : msg.image?.url}
+                    src={imageUrl}
                     alt="Generated or attached image"
                     className="w-full max-w-md max-h-64 object-cover rounded-xl border shadow-sm cursor-pointer hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
+                    onError={(e) => {
+                      // Hide image if it fails to load
+                      e.target.style.display = 'none';
+                      console.error('Failed to load image:', imageUrl);
+                    }}
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      const imageUrl = typeof msg.image === 'string' ? msg.image : msg.image?.url;
                       console.log('Image clicked, URL:', imageUrl);
                       // Image click handled by parent component
-                      if (imageUrl && onImageClick) {
+                      if (onImageClick) {
                         onImageClick(imageUrl);
                       }
                     }}
@@ -152,7 +177,7 @@ export default function ChatMessage({ msg, onImageClick }) {
                   {/* Click indicator overlay */}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-xl transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
                     <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium text-gray-700 shadow-lg">
-                      Click to view full size
+                      Click icon to view full size
                     </div>
                   </div>
                   
@@ -162,7 +187,6 @@ export default function ChatMessage({ msg, onImageClick }) {
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        const imageUrl = typeof msg.image === 'string' ? msg.image : msg.image?.url;
                         if (imageUrl) {
                           // Create download link
                           const link = document.createElement('a');

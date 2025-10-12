@@ -66,7 +66,7 @@ export default function TopLoadingBar() {
           closestElement.onclick?.toString().includes('push')
         ));
 
-      if (isNavigation || (isInteractive && !target.type?.includes('text'))) {
+      if (isNavigation) {
         startLoading();
       }
     };

@@ -171,6 +171,16 @@ export async function POST(request) {
     const savedUserMessage = chat.messages[chat.messages.length - 2]; // Second to last message (user)
     const savedAssistantMessage = chat.messages[chat.messages.length - 1]; // Last message (assistant)
     
+    // Helper function to clean image data
+    const cleanImageData = (image) => {
+      if (!image) return undefined;
+      if (typeof image === 'string' && image.trim() !== '') return image;
+      if (typeof image === 'object' && image.url && typeof image.url === 'string' && image.url.trim() !== '') {
+        return { publicId: image.publicId, url: image.url };
+      }
+      return undefined;
+    };
+    
     const response = {
       chatId: chat._id.toString(),
       isNewChat,
@@ -178,14 +188,14 @@ export async function POST(request) {
         id: savedUserMessage._id.toString(),
         role: savedUserMessage.role,
         content: savedUserMessage.content,
-        image: savedUserMessage.image,
+        image: cleanImageData(savedUserMessage.image),
         timestamp: savedUserMessage.timestamp,
       },
       assistantMessage: {
         id: savedAssistantMessage._id.toString(),
         role: savedAssistantMessage.role,
         content: savedAssistantMessage.content,
-        image: savedAssistantMessage.image,
+        image: cleanImageData(savedAssistantMessage.image),
         timestamp: savedAssistantMessage.timestamp,
       },
       chatTitle: chat.title,

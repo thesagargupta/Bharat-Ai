@@ -31,6 +31,7 @@ function ChatContent() {
   const [isImageGenMode, setIsImageGenMode] = useState(false);
   const [isProcessingInitialMessage, setIsProcessingInitialMessage] = useState(false);
   const [imageModal, setImageModal] = useState({ isOpen: false, imageUrl: null });
+  const [userAvatar, setUserAvatar] = useState(null); // State for user's profile avatar
 
   const fileRef = useRef(null);
   const scrollRef = useRef(null);
@@ -122,18 +123,36 @@ function ChatContent() {
             
             // Update messages with real database IDs - the image should already be in the response
             setMessages(prev => {
-              const withoutTemp = prev.filter(msg => msg.id !== tempUserMessage.id);
-              // Add user message and AI response with proper IDs
+              // Filter out all temp messages and any duplicates
+              const withoutTempAndDuplicates = prev.filter(msg => 
+                msg.id.startsWith('temp-') || msg.id.startsWith('ai-')
+              );
+              
+              // Add user message and AI response with proper IDs from database
               const userMsg = {
-                ...chatData.userMessage,
-                content: `🎨 Generate image: ${prompt}`
+                id: chatData.userMessage.id,
+                role: chatData.userMessage.role,
+                content: `🎨 Generate image: ${prompt}`,
+                image: chatData.userMessage.image,
+                timestamp: chatData.userMessage.timestamp,
               };
               const aiMsg = {
-                ...chatData.assistantMessage,
+                id: chatData.assistantMessage.id,
+                role: chatData.assistantMessage.role,
                 content: `I've generated an image based on your prompt: "${prompt}"`,
-                // The image should already be included from the API response
+                image: chatData.assistantMessage.image,
+                timestamp: chatData.assistantMessage.timestamp,
               };
-              return [...withoutTemp, userMsg, aiMsg];
+              
+              // Get messages that are not temp and not the new ones
+              const existingMessages = prev.filter(msg => 
+                !msg.id.startsWith('temp-') && 
+                !msg.id.startsWith('ai-') &&
+                msg.id !== userMsg.id &&
+                msg.id !== aiMsg.id
+              );
+              
+              return [...existingMessages, userMsg, aiMsg];
             });
 
             // Update chat list
@@ -184,6 +203,61 @@ function ChatContent() {
       setIsTyping(false);
     }
   }
+
+  // Load user profile data (avatar)
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      if (session?.user) {
+        try {
+          // Add cache-busting to force fresh data
+          const response = await fetch('/api/user/profile', {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+            },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            // Set the user avatar from customImage or fallback to session image
+            setUserAvatar(data.user.image);
+            console.log('User avatar loaded:', data.user.image);
+          }
+        } catch (error) {
+          console.error('Error loading user profile:', error);
+          // Fallback to session image
+          setUserAvatar(session.user.image);
+        }
+      }
+    };
+
+    if (session?.user) {
+      loadUserProfile();
+    }
+
+    // Reload profile when window gains focus (user returns from another tab/page)
+    const handleFocus = () => {
+      if (session?.user) {
+        console.log('Window focused - reloading user profile');
+        loadUserProfile();
+      }
+    };
+
+    // Reload profile when page becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && session?.user) {
+        console.log('Page visible - reloading user profile');
+        loadUserProfile();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [session]);
 
   // Load chats from database
   useEffect(() => {
@@ -453,7 +527,12 @@ function ChatContent() {
         
         // Update messages with real IDs and AI response
         setMessages(prev => {
-          const withoutTemp = prev.filter(msg => msg.id !== tempUserMessage.id);
+          // Filter out temp messages and ensure no duplicates
+          const withoutTemp = prev.filter(msg => 
+            msg.id !== tempUserMessage.id && 
+            msg.id !== data.userMessage.id && 
+            msg.id !== data.assistantMessage.id
+          );
           return [...withoutTemp, data.userMessage, data.assistantMessage];
         });
 
@@ -731,14 +810,15 @@ function ChatContent() {
               className="relative hover:opacity-80 transition-opacity group"
               title="View Profile"
             >
-              {session?.user?.image ? (
+              {userAvatar || session?.user?.image ? (
                 <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-gray-200 group-hover:border-blue-500 transition-colors bg-gray-100">
                   <img
-                    src={session.user.image}
+                    src={userAvatar || session.user.image}
                     alt={session.user.name || "User"}
                     className="w-full h-full object-cover"
                     loading="lazy"
                     referrerPolicy="no-referrer"
+                    key={userAvatar} // Force re-render when avatar changes
                   />
                 </div>
               ) : (
@@ -756,19 +836,34 @@ function ChatContent() {
           className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 py-4 space-y-4"
           style={{ minHeight: 0, WebkitOverflowScrolling: 'touch' }}
         >
-          {messages.map((m) => (
-            <div key={m.id} className="animate-fadeIn">
-              <ChatMessage 
-                msg={{
-                  role: m.role,
-                  text: m.content,
-                  image: m.image, // Pass full image object instead of just URL
-                  id: m.id
-                }} 
-                onImageClick={handleImageClick}
-              />
-            </div>
-          ))}
+          {(() => {
+            // Deduplicate messages by ID - keep the last occurrence
+            const uniqueMessages = [];
+            const seenIds = new Set();
+            
+            // Iterate in reverse to keep the most recent version of each message
+            for (let i = messages.length - 1; i >= 0; i--) {
+              const msg = messages[i];
+              if (!seenIds.has(msg.id)) {
+                seenIds.add(msg.id);
+                uniqueMessages.unshift(msg);
+              }
+            }
+            
+            return uniqueMessages.map((m) => (
+              <div key={m.id} className="animate-fadeIn">
+                <ChatMessage 
+                  msg={{
+                    role: m.role,
+                    text: m.content,
+                    image: m.image, // Pass full image object instead of just URL
+                    id: m.id
+                  }} 
+                  onImageClick={handleImageClick}
+                />
+              </div>
+            ));
+          })()}
           
           {/* Typing Animation */}
           {isTyping && (

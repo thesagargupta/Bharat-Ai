@@ -29,6 +29,16 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
     }
 
+    // Helper function to clean image data
+    const cleanImageData = (image) => {
+      if (!image) return undefined;
+      if (typeof image === 'string' && image.trim() !== '') return image;
+      if (typeof image === 'object' && image.url && typeof image.url === 'string' && image.url.trim() !== '') {
+        return { publicId: image.publicId, url: image.url };
+      }
+      return undefined;
+    };
+
     // Format chat for frontend
     const formattedChat = {
       id: chat._id.toString(),
@@ -37,7 +47,7 @@ export async function GET(request, { params }) {
         id: msg._id.toString(),
         role: msg.role,
         content: msg.content,
-        image: msg.image,
+        image: cleanImageData(msg.image),
         timestamp: msg.timestamp,
       })),
       createdAt: chat.createdAt,

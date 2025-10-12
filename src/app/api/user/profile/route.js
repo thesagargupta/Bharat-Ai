@@ -33,7 +33,13 @@ export async function GET(request) {
       stats: user.stats,
     };
 
-    return NextResponse.json({ user: userData });
+    return NextResponse.json({ user: userData }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
+    });
   } catch (error) {
     console.error('Error fetching user profile:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

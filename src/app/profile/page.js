@@ -123,7 +123,7 @@ export default function ProfilePage() {
         }
 
         const imageData = await imageResponse.json();
-        updatedProfile = { ...updatedProfile, image: imageData.imageUrl };
+        updatedProfile = { ...updatedProfile, avatar: imageData.imageUrl };
       }
 
       // Update the state with the final profile data
