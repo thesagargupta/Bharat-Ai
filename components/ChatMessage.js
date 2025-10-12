@@ -46,15 +46,6 @@ const processText = (text) => {
 const renderMarkdownText = (text) => {
   if (!text) return null;
   
-  // First, clean up escaped characters and unwanted symbols
-  let cleanedText = text
-    .replace(/\\\*/g, '•')  // Replace \* with bullet point
-    .replace(/\\n/g, '\n')  // Handle escaped newlines
-    .replace(/\\_/g, '_')   // Handle escaped underscores
-    .replace(/\\\[/g, '[')  // Handle escaped brackets
-    .replace(/\\\]/g, ']')
-    .trim();
-  
   const parts = [];
   let lastIndex = 0;
   
@@ -62,10 +53,11 @@ const renderMarkdownText = (text) => {
   const markdownRegex = /\*\*([^*\n]+?)\*\*/g;
   let match;
   
-  while ((match = markdownRegex.exec(cleanedText)) !== null) {
-    // Skip if this is part of a bullet point pattern
-    const beforeMatch = cleanedText.substring(Math.max(0, match.index - 4), match.index);
-    const isBulletPoint = /^\s+\*$/.test(beforeMatch) || /^\*\s*$/.test(beforeMatch) || /^•/.test(beforeMatch);
+  while ((match = markdownRegex.exec(text)) !== null) {
+    // Skip if this is part of a bullet point pattern (line starts with * or -)
+    const lineStart = text.lastIndexOf('\n', match.index) + 1;
+    const beforeMatch = text.substring(lineStart, match.index).trim();
+    const isBulletPoint = beforeMatch === '*' || beforeMatch === '-' || beforeMatch === '•';
     
     if (isBulletPoint) {
       continue;
@@ -73,7 +65,7 @@ const renderMarkdownText = (text) => {
     
     // Add text before the match
     if (match.index > lastIndex) {
-      parts.push(cleanedText.slice(lastIndex, match.index));
+      parts.push(text.slice(lastIndex, match.index));
     }
     
     // Bold text with better styling
@@ -87,12 +79,12 @@ const renderMarkdownText = (text) => {
   }
   
   // Add remaining text
-  if (lastIndex < cleanedText.length) {
-    parts.push(cleanedText.slice(lastIndex));
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
   }
   
-  // If no markdown found, return cleaned text
-  return parts.length > 0 ? parts : cleanedText;
+  // If no markdown found, return original text
+  return parts.length > 0 ? parts : text;
 };
 
 // Code block component
@@ -141,7 +133,21 @@ const CodeBlock = ({ language, content }) => {
 
 export default function ChatMessage({ msg, userAvatar, onImageClick }) {
   const isUser = msg.role === "user";
-  const textParts = processText(msg.text);
+  
+  // Clean the entire text first before processing
+  const cleanedMessageText = msg.text 
+    ? msg.text
+        .replace(/\\\*/g, '* ')      // Replace \* with * (space after to ensure it's not treated as markdown)
+        .replace(/\\n/g, '\n')       // Handle escaped newlines
+        .replace(/\\_/g, '_')        // Handle escaped underscores
+        .replace(/\\\[/g, '[')       // Handle escaped brackets
+        .replace(/\\\]/g, ']')       // Handle escaped brackets
+        .replace(/\\"/g, '"')        // Handle escaped quotes
+        .replace(/\\'/g, "'")        // Handle escaped quotes
+        .replace(/\\\\/g, '\\')      // Handle double backslashes
+    : msg.text;
+  
+  const textParts = processText(cleanedMessageText);
   
   // Helper function to get valid image URL
   const getImageUrl = (image) => {
