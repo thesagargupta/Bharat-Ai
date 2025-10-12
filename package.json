@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "prebuild": "node scripts/inject-version.js",
     "build": "next build --turbopack",
-    "start": "next start"
+    "start": "next start",
+    "postbuild": "echo 'Build complete with cache-busting enabled!'"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

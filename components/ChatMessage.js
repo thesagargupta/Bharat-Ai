@@ -42,6 +42,59 @@ const processText = (text) => {
   return parts.length > 0 ? parts : [{ type: 'text', content: text }];
 };
 
+// Render markdown text with bold formatting (like ChatGPT)
+const renderMarkdownText = (text) => {
+  if (!text) return null;
+  
+  // First, clean up escaped characters and unwanted symbols
+  let cleanedText = text
+    .replace(/\\\*/g, '•')  // Replace \* with bullet point
+    .replace(/\\n/g, '\n')  // Handle escaped newlines
+    .replace(/\\_/g, '_')   // Handle escaped underscores
+    .replace(/\\\[/g, '[')  // Handle escaped brackets
+    .replace(/\\\]/g, ']')
+    .trim();
+  
+  const parts = [];
+  let lastIndex = 0;
+  
+  // Regex to match bold (**text**) but not bullet points
+  const markdownRegex = /\*\*([^*\n]+?)\*\*/g;
+  let match;
+  
+  while ((match = markdownRegex.exec(cleanedText)) !== null) {
+    // Skip if this is part of a bullet point pattern
+    const beforeMatch = cleanedText.substring(Math.max(0, match.index - 4), match.index);
+    const isBulletPoint = /^\s+\*$/.test(beforeMatch) || /^\*\s*$/.test(beforeMatch) || /^•/.test(beforeMatch);
+    
+    if (isBulletPoint) {
+      continue;
+    }
+    
+    // Add text before the match
+    if (match.index > lastIndex) {
+      parts.push(cleanedText.slice(lastIndex, match.index));
+    }
+    
+    // Bold text with better styling
+    parts.push(
+      <strong key={`bold-${match.index}`} className="font-bold text-gray-900 dark:text-white">
+        {match[1]}
+      </strong>
+    );
+    
+    lastIndex = match.index + match[0].length;
+  }
+  
+  // Add remaining text
+  if (lastIndex < cleanedText.length) {
+    parts.push(cleanedText.slice(lastIndex));
+  }
+  
+  // If no markdown found, return cleaned text
+  return parts.length > 0 ? parts : cleanedText;
+};
+
 // Code block component
 const CodeBlock = ({ language, content }) => {
   const [copied, setCopied] = useState(false);
@@ -86,7 +139,7 @@ const CodeBlock = ({ language, content }) => {
   );
 };
 
-export default function ChatMessage({ msg, onImageClick }) {
+export default function ChatMessage({ msg, userAvatar, onImageClick }) {
   const isUser = msg.role === "user";
   const textParts = processText(msg.text);
   
@@ -113,14 +166,29 @@ export default function ChatMessage({ msg, onImageClick }) {
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-6`}>
       <div className={`flex items-start gap-3 max-w-[85%] ${isUser ? "flex-row-reverse" : "flex-row"}`}>
-        {/* Avatar */}
-        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-          isUser
-            ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white"
-            : "bg-gradient-to-r from-indigo-500 to-purple-500 text-white"
-        }`}>
-          {isUser ? <FiUser size={16} /> : <FiCpu size={16} />}
-        </div>
+        {/* Avatar - Use custom avatar for user, icon for AI */}
+        {isUser && userAvatar ? (
+          <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden border-2 border-blue-400 shadow-md">
+            <img 
+              src={userAvatar} 
+              alt="User avatar" 
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // Fallback to icon if image fails to load
+                e.target.style.display = 'none';
+                e.target.parentElement.innerHTML = '<div class="w-full h-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center"><svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg></div>';
+              }}
+            />
+          </div>
+        ) : (
+          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+            isUser
+              ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white"
+              : "bg-gradient-to-r from-indigo-500 to-purple-500 text-white"
+          }`}>
+            {isUser ? <FiUser size={16} /> : <FiCpu size={16} />}
+          </div>
+        )}
 
         <div className={`flex-1 min-w-0 ${isUser ? "text-right" : "text-left"}`}>
           <div
@@ -142,7 +210,7 @@ export default function ChatMessage({ msg, onImageClick }) {
                       <div key={index} className="whitespace-pre-wrap break-words">
                         {part.content.split('\n').map((line, lineIndex) => (
                           <React.Fragment key={lineIndex}>
-                            {line}
+                            {renderMarkdownText(line)}
                             {lineIndex < part.content.split('\n').length - 1 && <br />}
                           </React.Fragment>
                         ))}

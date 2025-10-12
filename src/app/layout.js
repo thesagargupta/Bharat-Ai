@@ -3,6 +3,7 @@ import './globals.css'
 import TopLoadingBar from '../../components/TopLoadingBar'
 import AuthProvider from '../../components/AuthProvider'
 import PWAInstallPrompt from '../../components/PWAInstallPrompt'
+import ServiceWorkerManager from '../../components/ServiceWorkerManager'
 import { Toaster } from 'react-hot-toast'
 
 export const metadata = {
@@ -122,10 +123,11 @@ export default function RootLayout({ children }) {
           <Suspense fallback={null}>
             <TopLoadingBar />
           </Suspense>
+          <ServiceWorkerManager />
           {children}
           <PWAInstallPrompt />
           <Toaster
-            position="top-right"
+            position="top-center"
             toastOptions={{
               duration: 4000,
               style: {
@@ -136,8 +138,10 @@ export default function RootLayout({ children }) {
                 boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
                 fontFamily: 'inherit',
                 fontSize: '14px',
-                padding: '12px 16px',
-                maxWidth: '400px',
+                padding: '14px 20px',
+                maxWidth: '500px',
+                minWidth: '300px',
+                textAlign: 'center',
               },
               success: {
                 style: {
