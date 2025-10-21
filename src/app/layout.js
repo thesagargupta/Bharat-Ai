@@ -2,8 +2,8 @@ import React, { Suspense } from 'react'
 import './globals.css'
 import TopLoadingBar from '../../components/TopLoadingBar'
 import AuthProvider from '../../components/AuthProvider'
-import PWAInstallPrompt from '../../components/PWAInstallPrompt'
-import ServiceWorkerManager from '../../components/ServiceWorkerManager'
+import ServiceWorkerCleanup from '../../components/ServiceWorkerCleanup'
+import ErrorSuppressor from '../../components/ErrorSuppressor'
 import { Toaster } from 'react-hot-toast'
 
 export const metadata = {
@@ -78,7 +78,6 @@ export const metadata = {
     icon: '/favicon.ico',
     apple: '/logo.png',
   },
-  manifest: '/manifest.json',
   verification: {
     google: 'your-google-verification-code', // Replace with actual Google Search Console verification
   },
@@ -92,24 +91,6 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning={true}>
       <head>
-        {/* PWA and Mobile App Tags */}
-        <meta name="theme-color" content="#ff9933" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Bharat AI" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="msapplication-TileColor" content="#ff9933" />
-        <meta name="msapplication-tap-highlight" content="no" />
-        
-        {/* PWA Manifest */}
-        <link rel="manifest" href="/manifest.json" />
-        
-        {/* Apple Touch Icons */}
-        <link rel="apple-touch-icon" href="/logo.png" />
-        <link rel="apple-touch-icon" sizes="152x152" href="/logo.png" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/logo.png" />
-        <link rel="apple-touch-icon" sizes="167x167" href="/logo.png" />
-        
         {/* Favicon */}
         <link rel="icon" type="image/png" sizes="32x32" href="/logo.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/logo.png" />
@@ -123,9 +104,9 @@ export default function RootLayout({ children }) {
           <Suspense fallback={null}>
             <TopLoadingBar />
           </Suspense>
-          <ServiceWorkerManager />
+          <ServiceWorkerCleanup />
+          <ErrorSuppressor />
           {children}
-          <PWAInstallPrompt />
           <Toaster
             position="top-center"
             toastOptions={{

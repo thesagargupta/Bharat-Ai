@@ -32,7 +32,7 @@ export default function SettingsPage() {
   
   const [settings, setSettings] = useState({
     theme: "light",
-    notifications: true,
+    notifications: false,
     soundEffects: false,
     language: "en",
     autoSave: true,
@@ -47,39 +47,6 @@ export default function SettingsPage() {
     message: ""
   });
   const [feedbackSent, setFeedbackSent] = useState(false);
-  const [notificationPermission, setNotificationPermission] = useState('default');
-  const [isSubscribed, setIsSubscribed] = useState(false);
-
-  // Initialize notification settings and service worker
-  useEffect(() => {
-    const initializeNotifications = async () => {
-      if ('serviceWorker' in navigator && 'PushManager' in window) {
-        try {
-          // Register service worker
-          const registration = await navigator.serviceWorker.register('/sw.js');
-          console.log('Service Worker registered:', registration);
-          
-          // Check current notification permission
-          const permission = Notification.permission;
-          setNotificationPermission(permission);
-          
-          // Check if user is already subscribed
-          const subscription = await registration.pushManager.getSubscription();
-          setIsSubscribed(!!subscription);
-          
-          if (subscription) {
-            setSettings(prev => ({ ...prev, notifications: true }));
-          }
-        } catch (error) {
-          console.error('Error initializing notifications:', error);
-        }
-      }
-    };
-    
-    if (status === "authenticated") {
-      initializeNotifications();
-    }
-  }, [status]);
 
   // Show loading state while checking authentication
   if (status === "loading") {
@@ -98,95 +65,8 @@ export default function SettingsPage() {
     return null;
   }
 
-  const handleToggle = async (key) => {
-    if (key === 'notifications') {
-      await handleNotificationToggle();
-    } else {
-      setSettings(prev => ({ ...prev, [key]: !prev[key] }));
-    }
-  };
-
-  const handleNotificationToggle = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      warningToast('Push notifications are not supported in this browser.');
-      return;
-    }
-
-    try {
-      if (!settings.notifications) {
-        // Subscribe to notifications
-        const permission = await Notification.requestPermission();
-        setNotificationPermission(permission);
-        
-        if (permission === 'granted') {
-          const registration = await navigator.serviceWorker.ready;
-          
-          // Convert VAPID key to Uint8Array
-          const vapidPublicKey = 'BIH7PpMURhcBtJE1XTyTwjtHHDdgDKGv-6cI6Jwsb7do6AuPi7DmQ6yaugzlpokF4YwPETtF3he5nKENsBbGbkQ';
-          const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
-          
-          const subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: convertedVapidKey
-          });
-          
-          // Send subscription to server
-          const response = await fetch('/api/notifications/subscribe', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ subscription }),
-          });
-          
-          if (response.ok) {
-            setSettings(prev => ({ ...prev, notifications: true }));
-            setIsSubscribed(true);
-            successToast('Push notifications enabled successfully!');
-          } else {
-            throw new Error('Failed to save subscription');
-          }
-        } else {
-          errorToast('Notification permission denied. Please enable it in your browser settings.');
-        }
-      } else {
-        // Unsubscribe from notifications
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.getSubscription();
-        
-        if (subscription) {
-          await subscription.unsubscribe();
-          
-          // Remove subscription from server
-          await fetch('/api/notifications/subscribe', {
-            method: 'DELETE',
-          });
-        }
-        
-        setSettings(prev => ({ ...prev, notifications: false }));
-        setIsSubscribed(false);
-        successToast('Push notifications disabled successfully!');
-      }
-    } catch (error) {
-      console.error('Error toggling notifications:', error);
-      errorToast('Failed to update notification settings. Please try again.');
-    }
-  };
-
-  // Helper function to convert VAPID key
-  const urlBase64ToUint8Array = (base64String) => {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding)
-      .replace(/-/g, '+')
-      .replace(/_/g, '/');
-    
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
+  const handleToggle = (key) => {
+    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleSave = () => {
@@ -293,33 +173,18 @@ export default function SettingsPage() {
             </h2>
           </div>
           <div className="p-6 space-y-4">
-            {/* Notifications Toggle */}
+            {/* Push Notifications Toggle */}
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-gray-900">Push Notifications</p>
                 <p className="text-sm text-gray-500">
                   Receive notifications for new messages
-                  {notificationPermission === 'denied' && (
-                    <span className="block text-red-500 text-xs mt-1">
-                      Permission denied. Please enable in browser settings.
-                    </span>
-                  )}
-                  {!('serviceWorker' in navigator) && (
-                    <span className="block text-orange-500 text-xs mt-1">
-                      Not supported in this browser.
-                    </span>
-                  )}
                 </p>
               </div>
               <button
                 onClick={() => handleToggle('notifications')}
-                disabled={notificationPermission === 'denied' || !('serviceWorker' in navigator)}
                 className={`relative w-14 h-8 rounded-full transition-colors ${
                   settings.notifications ? 'bg-blue-500' : 'bg-gray-300'
-                } ${
-                  (notificationPermission === 'denied' || !('serviceWorker' in navigator)) 
-                    ? 'opacity-50 cursor-not-allowed' 
-                    : ''
                 }`}
               >
                 <span

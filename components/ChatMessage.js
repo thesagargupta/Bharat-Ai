@@ -169,6 +169,9 @@ export default function ChatMessage({ msg, userAvatar, onImageClick }) {
   
   const imageUrl = getImageUrl(msg.image);
   
+  // State to track if image failed to load
+  const [imageLoadError, setImageLoadError] = useState(false);
+  
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-6`}>
       <div className={`flex items-start gap-3 max-w-[85%] ${isUser ? "flex-row-reverse" : "flex-row"}`}>
@@ -226,7 +229,7 @@ export default function ChatMessage({ msg, userAvatar, onImageClick }) {
                 })}
               </div>
             )}
-            {imageUrl && (
+            {imageUrl && !imageLoadError && (
               <div className="mt-3">
                 <div className="relative inline-block group">
                   <img
@@ -234,14 +237,18 @@ export default function ChatMessage({ msg, userAvatar, onImageClick }) {
                     alt="Generated or attached image"
                     className="w-full max-w-md max-h-64 object-cover rounded-xl border shadow-sm cursor-pointer hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
                     onError={(e) => {
-                      // Hide image if it fails to load
-                      e.target.style.display = 'none';
-                      console.error('Failed to load image:', imageUrl);
+                      // Handle image load error gracefully
+                      setImageLoadError(true);
+                      // Prevent default error handling
+                      e.preventDefault();
+                    }}
+                    onLoad={() => {
+                      // Reset error state when image loads successfully
+                      setImageLoadError(false);
                     }}
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      console.log('Image clicked, URL:', imageUrl);
                       // Image click handled by parent component
                       if (onImageClick) {
                         onImageClick(imageUrl);
@@ -251,7 +258,7 @@ export default function ChatMessage({ msg, userAvatar, onImageClick }) {
                   {/* Click indicator overlay */}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-xl transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
                     <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium text-gray-700 shadow-lg">
-                      Click icon to view full size
+                      Click to view full size
                     </div>
                   </div>
                   
@@ -278,6 +285,18 @@ export default function ChatMessage({ msg, userAvatar, onImageClick }) {
                       <FiDownload size={16} />
                     </button>
                   </div>
+                </div>
+              </div>
+            )}
+            {imageUrl && imageLoadError && (
+              <div className="mt-3">
+                <div className="bg-gray-100 border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-600">
+                  <p className="flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Image temporarily unavailable
+                  </p>
                 </div>
               </div>
             )}
