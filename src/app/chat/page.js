@@ -709,7 +709,7 @@ function ChatContent() {
                   <div className="text-xs text-gray-500 truncate mt-1">{chat.lastMessage}</div>
                 </div>
                 <button
-                  className="ml-2 p-1 rounded hover:bg-gray-200 text-gray-500 opacity-0 group-hover:opacity-100"
+                  className="ml-2 p-1 rounded md:hover:bg-gray-200 text-gray-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                   title="Delete chat"
                   onClick={e => { e.stopPropagation(); openDeleteModal(chat.id); }}
                 >
