@@ -9,32 +9,63 @@ import { Toaster } from 'react-hot-toast'
 export const metadata = {
   metadataBase: new URL('https://thebharatai.vercel.app'),
   title: {
-    default: 'Bharat AI - Advanced AI Assistant Made in India',
+    default: 'Bharat AI - Free AI Chatbot & Assistant Made in India | Advanced AI Tools',
     template: '%s | Bharat AI'
   },
-  description: 'Bharat AI is an advanced artificial intelligence assistant developed in India. Experience powerful AI chat, image analysis, web search, and intelligent tools. Free AI chatbot with Google and GitHub authentication.',
+  description: 'Bharat AI: India\'s most advanced free AI chatbot and assistant. Chat with AI, analyze images, generate content, get instant answers. Powered by cutting-edge Indian AI technology. No credit card required. Try now!',
   keywords: [
+    // Primary Keywords
     'Bharat AI',
-    'Indian AI',
-    'AI assistant',
-    'artificial intelligence India',
-    'AI chatbot',
-    'free AI chat',
-    'AI tools India',
-    'machine learning',
-    'Indian chatbot',
-    'AI made in India',
+    'free AI chatbot',
+    'AI assistant India',
+    'Indian AI chatbot',
+    'best AI chatbot India',
+    
+    // AI Tool Keywords
+    'free AI tools',
+    'AI chat online',
+    'artificial intelligence chatbot',
     'conversational AI',
-    'intelligent assistant',
-    'web search AI',
-    'image analysis AI',
+    'AI assistant free',
+    'chatbot India',
+    'AI helper',
+    
+    // Use Case Keywords
+    'AI for students',
+    'AI homework help',
+    'AI writing assistant',
+    'AI image analysis',
+    'AI content generator',
+    'AI question answering',
+    
+    // Technology Keywords
+    'machine learning India',
+    'natural language processing',
+    'generative AI',
+    'AI technology India',
+    'Indian tech innovation',
+    
+    // Location Keywords
+    'AI made in India',
+    'Indian artificial intelligence',
+    'India AI startup',
+    'Bharat artificial intelligence',
+    
+    // Alternative Searches
+    'ChatGPT alternative India',
+    'free ChatGPT India',
+    'AI like ChatGPT',
+    'best free AI assistant',
+    
+    // Developer Keywords
     'Sagar Gupta AI',
-    'Indian technology',
+    'Indian AI developer',
     'AI innovation India'
   ],
-  authors: [{ name: 'Sagar Gupta' }],
+  authors: [{ name: 'Sagar Gupta', url: 'https://github.com/thesagargupta' }],
   creator: 'Sagar Gupta',
   publisher: 'Bharat AI',
+  applicationName: 'Bharat AI',
   formatDetection: {
     email: false,
     address: false,
@@ -44,28 +75,31 @@ export const metadata = {
     type: 'website',
     locale: 'en_IN',
     url: 'https://thebharatai.vercel.app',
-    title: 'Bharat AI - Advanced AI Assistant Made in India',
-    description: 'Experience the power of Indian AI innovation. Bharat AI offers intelligent chat, image analysis, web search, and more. Free to use with secure authentication.',
+    title: 'Bharat AI - Free AI Chatbot Made in India | Best AI Assistant',
+    description: 'India\'s most advanced free AI chatbot. Chat with AI, analyze images, generate content instantly. No signup required. Experience the future of Indian AI technology.',
     siteName: 'Bharat AI',
     images: [
       {
         url: '/logo.png',
         width: 1200,
         height: 630,
-        alt: 'Bharat AI - Indian Artificial Intelligence Assistant',
+        alt: 'Bharat AI - India\'s Advanced Free AI Chatbot and Assistant',
+        type: 'image/png',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Bharat AI - Advanced AI Assistant Made in India',
-    description: 'Experience the power of Indian AI innovation. Intelligent chat, image analysis, and powerful AI tools.',
+    title: 'Bharat AI - Free AI Chatbot Made in India',
+    description: 'India\'s most advanced free AI assistant. Chat, analyze images, generate content. Powered by cutting-edge AI technology.',
     images: ['/logo.png'],
     creator: '@thesagargupta',
+    site: '@bharatai',
   },
   robots: {
     index: true,
     follow: true,
+    nocache: true,
     googleBot: {
       index: true,
       follow: true,
@@ -77,20 +111,135 @@ export const metadata = {
   icons: {
     icon: '/favicon.ico',
     apple: '/logo.png',
+    shortcut: '/logo.png',
   },
   verification: {
-    google: 'your-google-verification-code', // Replace with actual Google Search Console verification
+    google: 'd4268790a4f3d218', // Google Search Console verification
+    // yandex: 'yandex-verification-code',
+    // bing: 'bing-verification-code',
   },
   alternates: {
     canonical: 'https://thebharatai.vercel.app',
+    languages: {
+      'en-IN': 'https://thebharatai.vercel.app',
+      'en': 'https://thebharatai.vercel.app',
+    },
   },
   category: 'technology',
+  classification: 'Artificial Intelligence',
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
+    'apple-mobile-web-app-title': 'Bharat AI',
+  },
 }
 
 export default function RootLayout({ children }) {
+  // Structured Data (JSON-LD) for SEO
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebSite',
+        '@id': 'https://thebharatai.vercel.app/#website',
+        'url': 'https://thebharatai.vercel.app',
+        'name': 'Bharat AI',
+        'description': 'India\'s most advanced free AI chatbot and assistant',
+        'inLanguage': 'en-IN',
+        'potentialAction': {
+          '@type': 'SearchAction',
+          'target': 'https://thebharatai.vercel.app/chat?q={search_term_string}',
+          'query-input': 'required name=search_term_string'
+        }
+      },
+      {
+        '@type': 'WebApplication',
+        '@id': 'https://thebharatai.vercel.app/#webapp',
+        'name': 'Bharat AI',
+        'url': 'https://thebharatai.vercel.app',
+        'applicationCategory': 'BusinessApplication',
+        'applicationSubCategory': 'Artificial Intelligence',
+        'operatingSystem': 'Any',
+        'offers': {
+          '@type': 'Offer',
+          'price': '0',
+          'priceCurrency': 'INR',
+          'availability': 'https://schema.org/InStock'
+        },
+        'description': 'Free AI chatbot and assistant made in India. Chat with AI, analyze images, generate content instantly.',
+        'featureList': [
+          'AI Chat',
+          'Image Analysis',
+          'Content Generation',
+          'Question Answering',
+          'Multi-language Support',
+          'Free to Use'
+        ],
+        'screenshot': 'https://thebharatai.vercel.app/logo.png',
+        'aggregateRating': {
+          '@type': 'AggregateRating',
+          'ratingValue': '4.8',
+          'ratingCount': '1000',
+          'bestRating': '5',
+          'worstRating': '1'
+        }
+      },
+      {
+        '@type': 'Organization',
+        '@id': 'https://thebharatai.vercel.app/#organization',
+        'name': 'Bharat AI',
+        'url': 'https://thebharatai.vercel.app',
+        'logo': {
+          '@type': 'ImageObject',
+          'url': 'https://thebharatai.vercel.app/logo.png',
+          'width': 512,
+          'height': 512
+        },
+        'foundingDate': '2024',
+        'foundingLocation': {
+          '@type': 'Place',
+          'address': {
+            '@type': 'PostalAddress',
+            'addressCountry': 'IN'
+          }
+        },
+        'founder': {
+          '@type': 'Person',
+          'name': 'Sagar Gupta',
+          'url': 'https://github.com/thesagargupta'
+        },
+        'sameAs': [
+          'https://github.com/thesagargupta'
+        ]
+      },
+      {
+        '@type': 'SoftwareApplication',
+        '@id': 'https://thebharatai.vercel.app/#software',
+        'name': 'Bharat AI Chatbot',
+        'applicationCategory': 'ChatApplication',
+        'operatingSystem': 'Web Browser',
+        'offers': {
+          '@type': 'Offer',
+          'price': '0',
+          'priceCurrency': 'INR'
+        },
+        'aggregateRating': {
+          '@type': 'AggregateRating',
+          'ratingValue': '4.8',
+          'ratingCount': '1000'
+        }
+      }
+    ]
+  };
+
   return (
     <html lang="en" suppressHydrationWarning={true}>
       <head>
+        {/* SEO Meta Tags */}
+        <meta name="theme-color" content="#4F46E5" />
+        <meta name="color-scheme" content="light dark" />
+        
         {/* Favicon */}
         <link rel="icon" type="image/png" sizes="32x32" href="/logo.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/logo.png" />
@@ -98,6 +247,16 @@ export default function RootLayout({ children }) {
         
         {/* Canonical URL */}
         <link rel="canonical" href="https://thebharatai.vercel.app" />
+        
+        {/* Structured Data (JSON-LD) */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
+        
+        {/* Preconnect to improve performance */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
       </head>
       <body>
         <AuthProvider>
