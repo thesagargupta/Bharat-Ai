@@ -38,6 +38,8 @@ function ChatContent() {
   const messageCounter = useRef(0);
   const hasInitialized = useRef(false);
   const typingRef = useRef(null);
+  const lastMessageRef = useRef(null);
+  const messagesEndRef = useRef(null);
   
   // IMPLEMENTED: Redirect to login if not authenticated
   useEffect(() => {
@@ -46,17 +48,33 @@ function ChatContent() {
     }
   }, [status, router]);
 
-  // Auto scroll to typing animation
+  // Professional auto-scroll: Scroll to show new messages at the START (like ChatGPT/Gemini)
   useEffect(() => {
     if (isTyping && typingRef.current) {
+      // When typing indicator appears, smoothly scroll to show it at the top of view
       setTimeout(() => {
         typingRef.current?.scrollIntoView({ 
           behavior: 'smooth', 
-          block: 'end' 
+          block: 'start',  // Changed from 'end' to 'start'
+          inline: 'nearest'
         });
       }, 100);
     }
   }, [isTyping]);
+
+  // Scroll to show new AI messages when they arrive
+  useEffect(() => {
+    if (!isTyping && messages.length > 0 && lastMessageRef.current) {
+      // When new message arrives (typing stops), scroll to show it from the beginning
+      setTimeout(() => {
+        lastMessageRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start',  // Show message at top of viewport
+          inline: 'nearest'
+        });
+      }, 100);
+    }
+  }, [messages.length, isTyping]);
 
   // Handle image generation
   async function handleImageGeneration(prompt) {
@@ -399,9 +417,18 @@ function ChatContent() {
     return null;
   }
 
-  function scrollToBottom() {
+  // Smooth scroll to bottom (used for initial message load)
+  function scrollToBottom(smooth = true) {
     if (!scrollRef.current) return;
-    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    
+    if (smooth && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'end' 
+      });
+    } else {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
   }
 
   function toggleTool(id) {
@@ -850,19 +877,28 @@ function ChatContent() {
               }
             }
             
-            return uniqueMessages.map((m) => (
-              <div key={m.id} className="animate-fadeIn">
-                <ChatMessage 
-                  msg={{
-                    role: m.role,
-                    text: m.content,
-                    image: m.image, // Pass full image object instead of just URL
-                    id: m.id
-                  }} 
-                  onImageClick={handleImageClick}
-                />
-              </div>
-            ));
+            return uniqueMessages.map((m, index) => {
+              const isLastMessage = index === uniqueMessages.length - 1;
+              const isLastAIMessage = isLastMessage && m.role === 'assistant';
+              
+              return (
+                <div 
+                  key={m.id} 
+                  className="animate-fadeIn"
+                  ref={isLastAIMessage ? lastMessageRef : null}
+                >
+                  <ChatMessage 
+                    msg={{
+                      role: m.role,
+                      text: m.content,
+                      image: m.image, // Pass full image object instead of just URL
+                      id: m.id
+                    }} 
+                    onImageClick={handleImageClick}
+                  />
+                </div>
+              );
+            });
           })()}
           
           {/* Typing Animation */}
@@ -887,6 +923,9 @@ function ChatContent() {
               </div>
             </div>
           )}
+          
+          {/* Invisible anchor for scroll-to-bottom */}
+          <div ref={messagesEndRef} className="h-1" />
         </div>
 
         {/* Tools and Upload Preview */}
