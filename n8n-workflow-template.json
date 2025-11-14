@@ -1,0 +1,237 @@
+{
+  "name": "Bharat AI Chat Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bharatai-chat",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "bharatai-chat"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.action}}",
+              "value2": "generate_title"
+            }
+          ]
+        }
+      },
+      "name": "Is Title Generation?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepare chat request\nconst messages = [];\n\n// System prompt\nmessages.push({\n  role: \"system\",\n  content: `You are Bharat AI, a highly advanced AI assistant for Indian users. Be professional, helpful, and concise.`\n});\n\n// Add conversation history\nif ($json.conversationHistory && Array.isArray($json.conversationHistory)) {\n  $json.conversationHistory.forEach(msg => {\n    messages.push({\n      role: msg.role === 'assistant' ? 'assistant' : 'user',\n      content: msg.content\n    });\n  });\n}\n\n// Add current message\nmessages.push({\n  role: \"user\",\n  content: $json.message\n});\n\nreturn {\n  json: {\n    messages: messages,\n    model: \"gpt-3.5-turbo\",\n    temperature: 0.7,\n    max_tokens: 2000\n  }\n};"
+      },
+      "name": "Prepare Chat Request",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepare title generation request\nreturn {\n  json: {\n    messages: [\n      {\n        role: \"user\",\n        content: `Generate a short title (2-6 words, max 50 chars) for: \"${$json.message}\". Return only the title.`\n      }\n    ],\n    model: \"gpt-3.5-turbo\",\n    max_tokens: 20\n  }\n};"
+      },
+      "name": "Prepare Title Request",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "headerAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "messages",
+              "value": "={{$json.messages}}"
+            },
+            {
+              "name": "model",
+              "value": "={{$json.model}}"
+            },
+            {
+              "name": "temperature",
+              "value": "={{$json.temperature}}"
+            },
+            {
+              "name": "max_tokens",
+              "value": "={{$json.max_tokens}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "OpenAI API - Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "OpenAI Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "headerAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "messages",
+              "value": "={{$json.messages}}"
+            },
+            {
+              "name": "model",
+              "value": "={{$json.model}}"
+            },
+            {
+              "name": "max_tokens",
+              "value": "={{$json.max_tokens}}"
+            }
+          ]
+        }
+      },
+      "name": "OpenAI API - Title",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [850, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "OpenAI Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Format chat response\nconst response = $json.choices[0].message.content;\nconst usage = $json.usage || {};\n\nreturn {\n  json: {\n    success: true,\n    message: response,\n    usage: {\n      promptTokens: usage.prompt_tokens || 0,\n      completionTokens: usage.completion_tokens || 0,\n      totalTokens: usage.total_tokens || 0\n    }\n  }\n};"
+      },
+      "name": "Format Chat Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Format title response\nconst title = $json.choices[0].message.content.trim().replace(/['\"`]/g, '');\n\nreturn {\n  json: {\n    success: true,\n    title: title\n  }\n};"
+      },
+      "name": "Format Title Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    },
+
+    {
+      "parameters": {
+        "functionCode": "// Error handler\nreturn {\n  json: {\n    success: false,\n    error: $json.error?.message || 'An error occurred',\n    message: \"I apologize, but I'm experiencing technical difficulties. Please try again.\"\n  }\n};"
+      },
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 600]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is Title Generation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Title Generation?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Title Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Chat Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Chat Request": {
+      "main": [
+        [
+          {
+            "node": "OpenAI API - Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Title Request": {
+      "main": [
+        [
+          {
+            "node": "OpenAI API - Title",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI API - Chat": {
+      "main": [
+        [
+          {
+            "node": "Format Chat Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI API - Title": {
+      "main": [
+        [
+          {
+            "node": "Format Title Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Chat Response": {
+      "main": []
+    },
+    "Format Title Response": {
+      "main": []
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

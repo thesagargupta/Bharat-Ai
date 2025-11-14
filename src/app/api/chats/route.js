@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/route';
 import { connectToDatabase } from '../../../../lib/mongodb';
 import { User, Chat } from '../../../../lib/models';
-import { generateChatResponse, generateChatTitle } from '../../../../lib/gemini';
+import { generateChatResponse, generateChatTitle } from '../../../../lib/n8n-webhook';
 import { uploadToCloudinary } from '../../../../lib/cloudinary';
 
 // GET - Fetch user's chats
