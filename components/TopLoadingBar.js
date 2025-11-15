@@ -32,6 +32,29 @@ export default function TopLoadingBar() {
     };
   }, []);
 
+  // Function to complete loading bar
+  const completeLoading = useCallback(() => {
+    setProgress(100);
+    setTimeout(() => {
+      setIsLoading(false);
+      setProgress(0);
+    }, 200);
+  }, []);
+
+  // Listen for custom events to trigger loading bar manually
+  useEffect(() => {
+    const handleManualStart = () => startLoading();
+    const handleManualComplete = () => completeLoading();
+
+    window.addEventListener('topLoadingBar:start', handleManualStart);
+    window.addEventListener('topLoadingBar:complete', handleManualComplete);
+
+    return () => {
+      window.removeEventListener('topLoadingBar:start', handleManualStart);
+      window.removeEventListener('topLoadingBar:complete', handleManualComplete);
+    };
+  }, [startLoading, completeLoading]);
+
   // Global click handler for all interactive elements
   useEffect(() => {
     const handleClick = (event) => {

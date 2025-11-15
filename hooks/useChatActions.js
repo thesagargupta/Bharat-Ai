@@ -1,0 +1,267 @@
+"use client";
+import { useState } from "react";
+import { errorToast } from "../lib/toast";
+
+export function useChatActions(currentChatId, setMessages, setChats, setCurrentChatId, setIsTyping) {
+  
+  const handleImageGeneration = async (prompt) => {
+    setIsTyping(true);
+    
+    try {
+      const tempUserMessage = {
+        id: `temp-${Date.now()}`,
+        role: "user",
+        content: `🎨 Generate image: ${prompt}`,
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, tempUserMessage]);
+
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt,
+          model: 'stable-diffusion',
+          size: '1024x1024'
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        const aiResponse = {
+          id: `ai-${Date.now()}`,
+          role: "assistant",
+          content: `I've generated an image based on your prompt: "${prompt}"`,
+          image: { url: data.image.url },
+          timestamp: new Date(),
+        };
+
+        setMessages(prev => {
+          const withoutTemp = prev.filter(msg => msg.id !== tempUserMessage.id);
+          return [...withoutTemp, tempUserMessage, aiResponse];
+        });
+
+        try {
+          const chatResponse = await fetch('/api/chats', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: `🎨 Generate image: ${prompt}`,
+              chatId: currentChatId,
+              generatedImageUrl: data.image.url,
+            }),
+          });
+
+          if (chatResponse.ok) {
+            const chatData = await chatResponse.json();
+            
+            setMessages(prev => {
+              const userMsg = {
+                id: chatData.userMessage.id,
+                role: chatData.userMessage.role,
+                content: `🎨 Generate image: ${prompt}`,
+                image: chatData.userMessage.image,
+                timestamp: chatData.userMessage.timestamp,
+              };
+              const aiMsg = {
+                id: chatData.assistantMessage.id,
+                role: chatData.assistantMessage.role,
+                content: `I've generated an image based on your prompt: "${prompt}"`,
+                image: chatData.assistantMessage.image,
+                timestamp: chatData.assistantMessage.timestamp,
+              };
+              
+              const existingMessages = prev.filter(msg => 
+                !msg.id.startsWith('temp-') && 
+                !msg.id.startsWith('ai-') &&
+                msg.id !== userMsg.id &&
+                msg.id !== aiMsg.id
+              );
+              
+              return [...existingMessages, userMsg, aiMsg];
+            });
+
+            if (chatData.isNewChat) {
+              const newChat = {
+                id: chatData.chatId,
+                title: chatData.chatTitle,
+                messageCount: 2,
+                lastMessage: `Generated image: ${prompt.slice(0, 50)}...`,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              };
+              setChats(prev => [newChat, ...prev]);
+              setCurrentChatId(chatData.chatId);
+            } else {
+              setChats(prev => prev.map(chat => 
+                chat.id === currentChatId 
+                  ? {
+                      ...chat,
+                      messageCount: chat.messageCount + 2,
+                      lastMessage: `Generated image: ${prompt.slice(0, 50)}...`,
+                      updatedAt: new Date(),
+                    }
+                  : chat
+              ));
+            }
+          }
+        } catch (saveError) {
+          console.error('Error saving to chat:', saveError);
+        }
+
+        return true; // Success
+      } else {
+        const errorData = await response.json();
+        setMessages(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
+        errorToast(errorData.error || 'Failed to generate image');
+        return false;
+      }
+
+    } catch (error) {
+      console.error('Error generating image:', error);
+      setMessages(prev => prev.filter(msg => msg.id.startsWith('temp-')));
+      errorToast('An error occurred while generating the image.');
+      return false;
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleSendMessage = async (messageText, uploadedPreview) => {
+    if (!messageText.trim() && !uploadedPreview) return false;
+
+    setIsTyping(true);
+    
+    try {
+      let imageData = null;
+      if (uploadedPreview) {
+        const response = await fetch(uploadedPreview);
+        const blob = await response.blob();
+        const buffer = await blob.arrayBuffer();
+        imageData = {
+          data: Buffer.from(buffer).toString('base64'),
+          type: blob.type,
+        };
+      }
+
+      const tempUserMessage = {
+        id: `temp-${Date.now()}`,
+        role: "user",
+        content: messageText,
+        image: uploadedPreview ? { url: uploadedPreview } : undefined,
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, tempUserMessage]);
+
+      const response = await fetch('/api/chats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: messageText,
+          chatId: currentChatId,
+          imageData: imageData,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        setMessages(prev => {
+          const withoutTemp = prev.filter(msg => 
+            msg.id !== tempUserMessage.id && 
+            msg.id !== data.userMessage.id && 
+            msg.id !== data.assistantMessage.id
+          );
+          return [...withoutTemp, data.userMessage, data.assistantMessage];
+        });
+
+        if (data.isNewChat) {
+          const newChat = {
+            id: data.chatId,
+            title: data.chatTitle,
+            messageCount: 2,
+            lastMessage: data.assistantMessage.content.slice(0, 100),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          setChats(prev => [newChat, ...prev]);
+          setCurrentChatId(data.chatId);
+        } else {
+          setChats(prev => prev.map(chat => 
+            chat.id === data.chatId 
+              ? {
+                  ...chat,
+                  messageCount: chat.messageCount + 2,
+                  lastMessage: data.assistantMessage.content.slice(0, 100),
+                  updatedAt: new Date(),
+                }
+              : chat
+          ));
+        }
+        return true;
+      } else {
+        setMessages(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
+        errorToast('Failed to send message. Please try again.');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setMessages(prev => prev.filter(msg => msg.id.startsWith('temp-')));
+      errorToast('An error occurred while sending your message.');
+      return false;
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const loadChatMessages = async (chatId) => {
+    try {
+      const response = await fetch(`/api/chats/${chatId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentChatId(chatId);
+        setMessages(data.chat.messages);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error loading chat messages:', error);
+      return false;
+    }
+  };
+
+  const deleteChat = async (chatId) => {
+    try {
+      const response = await fetch(`/api/chats?chatId=${chatId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        return true;
+      } else {
+        errorToast('Failed to delete chat. Please try again.');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+      errorToast('An error occurred while deleting the chat.');
+      return false;
+    }
+  };
+
+  return {
+    handleImageGeneration,
+    handleSendMessage,
+    loadChatMessages,
+    deleteChat
+  };
+}
