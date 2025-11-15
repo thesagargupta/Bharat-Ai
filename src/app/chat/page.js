@@ -23,6 +23,7 @@ function ChatContent() {
   const [messages, setMessages] = useState([]);
   const [selectedTools, setSelectedTools] = useState([]);
   const [uploadedPreview, setUploadedPreview] = useState(null);
+  const [uploadedFileName, setUploadedFileName] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [chats, setChats] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
@@ -458,6 +459,7 @@ function ChatContent() {
     if (!file) return;
     const url = URL.createObjectURL(file);
     setUploadedPreview(url);
+    setUploadedFileName(file.name);
     setSelectedTools((prev) => (prev.includes("upload") ? prev : [...prev, "upload"]));
     e.target.value = "";
   }
@@ -468,6 +470,7 @@ function ChatContent() {
       if (uploadedPreview) {
         URL.revokeObjectURL(uploadedPreview);
         setUploadedPreview(null);
+        setUploadedFileName(null);
       }
     }
   }
@@ -495,6 +498,7 @@ function ChatContent() {
   async function handleSend() {
     if (!message.trim() && !uploadedPreview) return;
 
+    // Use the message text as-is, empty if only image
     const messageText = message.trim();
     setMessage("");
     setIsTyping(true);
@@ -515,6 +519,7 @@ function ChatContent() {
         imageData = {
           data: Buffer.from(buffer).toString('base64'),
           type: blob.type,
+          fileName: uploadedFileName || 'image.jpg',
         };
       }
 
@@ -533,6 +538,7 @@ function ChatContent() {
       if (uploadedPreview) {
         URL.revokeObjectURL(uploadedPreview);
         setUploadedPreview(null);
+        setUploadedFileName(null);
         setSelectedTools(prev => prev.filter(tool => tool !== "upload"));
       }
 

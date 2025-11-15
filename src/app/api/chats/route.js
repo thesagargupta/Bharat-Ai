@@ -65,6 +65,9 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Message or image is required' }, { status: 400 });
     }
 
+    // Use message as-is, or empty string for image-only messages
+    const messageContent = message?.trim() || '';
+
     await connectToDatabase();
 
     // Find or create user
@@ -95,7 +98,9 @@ export async function POST(request) {
     } else {
       // Create new chat
       isNewChat = true;
-      const title = await generateChatTitle(message.trim());
+      // Generate title from message, or use default for image-only
+      const titleSource = messageContent || 'Image Analysis';
+      const title = await generateChatTitle(titleSource);
       
       chat = await Chat.create({
         userId: user._id,
@@ -124,7 +129,7 @@ export async function POST(request) {
     // Create user message
     const userMessage = {
       role: 'user',
-      content: message.trim(),
+      content: messageContent,
       image: uploadedImage ? {
         publicId: uploadedImage.publicId,
         url: uploadedImage.url,
@@ -143,9 +148,13 @@ export async function POST(request) {
 
     // Generate AI response
     const aiResponse = await generateChatResponse(
-      message.trim(),
+      messageContent,
       conversationHistory.slice(0, -1), // Exclude the current message
-      imageData ? { buffer: Buffer.from(imageData.data, 'base64'), mimetype: imageData.type } : null
+      imageData ? { 
+        buffer: Buffer.from(imageData.data, 'base64'), 
+        mimetype: imageData.type,
+        fileName: imageData.fileName || 'uploaded-image.jpg'
+      } : null
     );
 
     // Create assistant message
