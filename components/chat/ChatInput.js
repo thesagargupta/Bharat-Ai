@@ -83,14 +83,6 @@ export default function ChatInput({
                     onSend();
                   }
                 }}
-                onFocus={(e) => {
-                  // Smooth scroll into view for mobile keyboard
-                  if (window.innerWidth < 640) {
-                    setTimeout(() => {
-                      e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    }, 300);
-                  }
-                }}
                 disabled={isTyping}
                 placeholder={
                   isTyping 

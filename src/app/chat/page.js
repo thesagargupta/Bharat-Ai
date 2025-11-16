@@ -12,7 +12,8 @@ import {
   DeleteChatModal,
   LoadingScreen,
   InitialMessageLoadingScreen,
-  ChatLoadingFallback
+  ChatLoadingFallback,
+  ScrollToBottomButton
 } from "../../../components/chat";
 import {
   useUserProfile,
@@ -42,7 +43,7 @@ function ChatContent() {
   // Custom hooks
   const { userAvatar, userName } = useUserProfile();
   const { chats, setChats, isLoadingChats } = useChats();
-  const { scrollRef, typingRef, lastMessageRef, messagesEndRef, scrollToBottom } = useAutoScroll(isTyping, messages);
+  const { scrollRef, typingRef, lastMessageRef, messagesEndRef, scrollToBottom, showScrollButton } = useAutoScroll(isTyping, messages);
   const { handleImageGeneration, handleSendMessage, loadChatMessages, deleteChat } = useChatActions(
     currentChatId, 
     setMessages, 
@@ -131,9 +132,7 @@ function ChatContent() {
     handleInitialMessage();
   }, [searchParams, session, isLoadingChats, setChats, setCurrentChatId]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+  // Removed auto-scroll on every message change - now handled in useAutoScroll hook
 
   // Show loading while authenticating
   if (status === "loading") {
@@ -206,6 +205,9 @@ function ChatContent() {
 
     const messageText = message.trim();
     setMessage("");
+    
+    // Enable auto-scroll for user's own message
+    scrollToBottom(true, true);
     
     if (isImageGenMode) {
       await handleImageGeneration(messageText);
@@ -309,15 +311,23 @@ function ChatContent() {
         {messages.length === 0 && !isTyping ? (
           <WelcomeScreen />
         ) : (
-          <MessageList
-            messages={messages}
-            isTyping={isTyping}
-            typingRef={typingRef}
-            lastMessageRef={lastMessageRef}
-            messagesEndRef={messagesEndRef}
-            scrollRef={scrollRef}
-            onImageClick={handleImageClick}
-          />
+          <>
+            <MessageList
+              messages={messages}
+              isTyping={isTyping}
+              typingRef={typingRef}
+              lastMessageRef={lastMessageRef}
+              messagesEndRef={messagesEndRef}
+              scrollRef={scrollRef}
+              onImageClick={handleImageClick}
+            />
+            
+            {/* Scroll to Bottom Button */}
+            <ScrollToBottomButton 
+              show={showScrollButton} 
+              onClick={() => scrollToBottom(true)} 
+            />
+          </>
         )}
 
         {/* Chat Input */}
