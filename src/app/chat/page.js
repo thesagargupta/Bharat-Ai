@@ -63,13 +63,37 @@ function ChatContent() {
     }
   }, [status, router]);
 
+  // Load chat from URL if chatId is present
+  useEffect(() => {
+    const loadChatFromUrl = async () => {
+      if (hasInitialized.current || !session?.user || isLoadingChats) return;
+      
+      const chatId = searchParams.get('chatId');
+      if (chatId) {
+        hasInitialized.current = true;
+        window.dispatchEvent(new Event('topLoadingBar:start'));
+        
+        try {
+          await loadChatMessages(chatId);
+        } finally {
+          window.dispatchEvent(new Event('topLoadingBar:complete'));
+        }
+      }
+    };
+
+    loadChatFromUrl();
+  }, [searchParams, session, isLoadingChats, loadChatMessages]);
+
   // Handle initial message from URL
   useEffect(() => {
     const handleInitialMessage = async () => {
       if (hasInitialized.current || !session?.user) return;
       
       const initialMessage = searchParams.get('message');
-      if (initialMessage && !isLoadingChats) {
+      const chatId = searchParams.get('chatId');
+      
+      // Only process initial message if no chatId is present
+      if (initialMessage && !chatId && !isLoadingChats) {
         hasInitialized.current = true;
         setIsProcessingInitialMessage(true);
         
@@ -109,6 +133,14 @@ function ChatContent() {
             setChats(prev => [newChat, ...prev]);
             setCurrentChatId(data.chatId);
             setMessages([data.userMessage, data.assistantMessage]);
+            
+            // Update URL with chat ID
+            if (typeof window !== 'undefined') {
+              const url = new URL(window.location.href);
+              url.searchParams.set('chatId', data.chatId);
+              url.searchParams.delete('message');
+              window.history.replaceState({}, '', url.pathname + url.search);
+            }
           } else {
             setMessages([]);
             console.error('Error sending initial message');
@@ -228,6 +260,13 @@ function ChatContent() {
     setUploadedPreview(null);
     setSelectedTools([]);
     setIsSidebarOpen(false);
+    
+    // Update URL to remove chatId
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('chatId');
+      window.history.replaceState({}, '', url.pathname + url.search);
+    }
   };
 
   const handleSelectChat = async (chatId) => {
@@ -243,6 +282,13 @@ function ChatContent() {
       setUploadedPreview(null);
       setSelectedTools([]);
       setIsSidebarOpen(false);
+      
+      // Update URL with selected chat ID
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        url.searchParams.set('chatId', chatId);
+        window.history.replaceState({}, '', url.pathname + url.search);
+      }
     } finally {
       window.dispatchEvent(new Event('topLoadingBar:complete'));
     }

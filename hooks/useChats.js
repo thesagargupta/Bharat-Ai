@@ -14,7 +14,11 @@ export function useChats() {
           const response = await fetch('/api/chats');
           if (response.ok) {
             const data = await response.json();
-            setChats(data.chats);
+            // Filter out duplicates by ID (in case API returns duplicates)
+            const uniqueChats = data.chats.filter((chat, index, self) =>
+              index === self.findIndex((c) => c.id === chat.id)
+            );
+            setChats(uniqueChats);
           }
         } catch (error) {
           console.error('Error loading chats:', error);

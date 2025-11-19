@@ -73,7 +73,10 @@ export default function ChatSidebar({
             {chats.length === 0 && (
               <div className="text-xs text-gray-400 px-2 py-2">No chats yet</div>
             )}
-            {chats.map((chat) => (
+            {chats.filter((chat, index, self) => 
+              // Extra safety: filter duplicates at render time
+              index === self.findIndex((c) => c.id === chat.id)
+            ).map((chat) => (
               <div 
                 key={chat.id} 
                 className={`flex items-center group rounded-lg px-2 py-2 cursor-pointer ${currentChatId === chat.id ? 'bg-gray-100 border border-gray-200' : 'hover:bg-gray-50'}`}

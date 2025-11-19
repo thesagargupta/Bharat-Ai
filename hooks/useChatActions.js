@@ -96,8 +96,19 @@ export function useChatActions(currentChatId, setMessages, setChats, setCurrentC
                 createdAt: new Date(),
                 updatedAt: new Date(),
               };
-              setChats(prev => [newChat, ...prev]);
+              // Remove any existing chat with same ID to prevent duplicates
+              setChats(prev => {
+                const filtered = prev.filter(c => c.id !== chatData.chatId);
+                return [newChat, ...filtered];
+              });
               setCurrentChatId(chatData.chatId);
+              
+              // Update URL with new chat ID
+              if (typeof window !== 'undefined') {
+                const url = new URL(window.location.href);
+                url.searchParams.set('chatId', chatData.chatId);
+                window.history.replaceState({}, '', url.pathname + url.search);
+              }
             } else {
               setChats(prev => prev.map(chat => 
                 chat.id === currentChatId 
@@ -115,19 +126,19 @@ export function useChatActions(currentChatId, setMessages, setChats, setCurrentC
           console.error('Error saving to chat:', saveError);
         }
 
-        return true; // Success
+        return { success: true, chatId: chatData?.chatId || currentChatId }; // Success
       } else {
         const errorData = await response.json();
         setMessages(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
         errorToast(errorData.error || 'Failed to generate image');
-        return false;
+        return { success: false };
       }
 
     } catch (error) {
       console.error('Error generating image:', error);
       setMessages(prev => prev.filter(msg => msg.id.startsWith('temp-')));
       errorToast('An error occurred while generating the image.');
-      return false;
+      return { success: false };
     } finally {
       setIsTyping(false);
     }
@@ -193,8 +204,19 @@ export function useChatActions(currentChatId, setMessages, setChats, setCurrentC
             createdAt: new Date(),
             updatedAt: new Date(),
           };
-          setChats(prev => [newChat, ...prev]);
+          // Remove any existing chat with same ID to prevent duplicates
+          setChats(prev => {
+            const filtered = prev.filter(c => c.id !== data.chatId);
+            return [newChat, ...filtered];
+          });
           setCurrentChatId(data.chatId);
+          
+          // Update URL with new chat ID
+          if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.set('chatId', data.chatId);
+            window.history.replaceState({}, '', url.pathname + url.search);
+          }
         } else {
           setChats(prev => prev.map(chat => 
             chat.id === data.chatId 
@@ -207,17 +229,17 @@ export function useChatActions(currentChatId, setMessages, setChats, setCurrentC
               : chat
           ));
         }
-        return true;
+        return { success: true, chatId: data.chatId, isNewChat: data.isNewChat };
       } else {
         setMessages(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
         errorToast('Failed to send message. Please try again.');
-        return false;
+        return { success: false };
       }
     } catch (error) {
       console.error('Error sending message:', error);
       setMessages(prev => prev.filter(msg => msg.id.startsWith('temp-')));
       errorToast('An error occurred while sending your message.');
-      return false;
+      return { success: false };
     } finally {
       setIsTyping(false);
     }
