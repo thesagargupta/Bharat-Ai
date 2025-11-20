@@ -116,6 +116,8 @@ function ChatContent() {
             body: JSON.stringify({
               message: initialMessage,
             }),
+            // Add timeout for mobile networks
+            signal: AbortSignal.timeout(60000),
           });
 
           if (response.ok) {

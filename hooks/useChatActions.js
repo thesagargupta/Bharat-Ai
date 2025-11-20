@@ -152,13 +152,33 @@ export function useChatActions(currentChatId, setMessages, setChats, setCurrentC
     try {
       let imageData = null;
       if (uploadedPreview) {
-        const response = await fetch(uploadedPreview);
-        const blob = await response.blob();
-        const buffer = await blob.arrayBuffer();
-        imageData = {
-          data: Buffer.from(buffer).toString('base64'),
-          type: blob.type,
-        };
+        try {
+          const response = await fetch(uploadedPreview);
+          const blob = await response.blob();
+          
+          // Convert blob to base64 using browser-compatible method
+          // This works on all devices including mobile phones
+          const base64String = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              // Remove the data URL prefix (e.g., "data:image/png;base64,")
+              const base64 = reader.result.split(',')[1];
+              resolve(base64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          
+          imageData = {
+            data: base64String,
+            type: blob.type,
+          };
+        } catch (imageError) {
+          console.error('Error processing image:', imageError);
+          errorToast('Failed to process image. Please try again.');
+          setIsTyping(false);
+          return { success: false };
+        }
       }
 
       const tempUserMessage = {
@@ -181,6 +201,8 @@ export function useChatActions(currentChatId, setMessages, setChats, setCurrentC
           chatId: currentChatId,
           imageData: imageData,
         }),
+        // Add timeout for mobile networks (60 seconds)
+        signal: AbortSignal.timeout(60000),
       });
 
       if (response.ok) {
@@ -231,14 +253,34 @@ export function useChatActions(currentChatId, setMessages, setChats, setCurrentC
         }
         return { success: true, chatId: data.chatId, isNewChat: data.isNewChat };
       } else {
+        // Get more detailed error message
+        let errorMessage = 'Failed to send message. Please try again.';
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch (e) {
+          // If JSON parsing fails, use default message
+        }
+        
         setMessages(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
-        errorToast('Failed to send message. Please try again.');
+        errorToast(errorMessage);
         return { success: false };
       }
     } catch (error) {
       console.error('Error sending message:', error);
       setMessages(prev => prev.filter(msg => msg.id.startsWith('temp-')));
-      errorToast('An error occurred while sending your message.');
+      
+      // Provide more specific error messages
+      let errorMessage = 'An error occurred while sending your message.';
+      if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+        errorMessage = 'Request timed out. Please check your connection and try again.';
+      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      }
+      
+      errorToast(errorMessage);
       return { success: false };
     } finally {
       setIsTyping(false);
