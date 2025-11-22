@@ -134,18 +134,9 @@ const CodeBlock = ({ language, content }) => {
 export default function ChatMessage({ msg, userAvatar, onImageClick }) {
   const isUser = msg.role === "user";
   
-  // Clean the entire text first before processing
-  const cleanedMessageText = msg.text 
-    ? msg.text
-        .replace(/\\\*/g, '* ')      // Replace \* with * (space after to ensure it's not treated as markdown)
-        .replace(/\\n/g, '\n')       // Handle escaped newlines
-        .replace(/\\_/g, '_')        // Handle escaped underscores
-        .replace(/\\\[/g, '[')       // Handle escaped brackets
-        .replace(/\\\]/g, ']')       // Handle escaped brackets
-        .replace(/\\"/g, '"')        // Handle escaped quotes
-        .replace(/\\'/g, "'")        // Handle escaped quotes
-        .replace(/\\\\/g, '\\')      // Handle double backslashes
-    : msg.text;
+  // Text is already formatted by the formatter.js utility in the webhook handler
+  // We just need to clean up any remaining escape sequences
+  const cleanedMessageText = msg.text || '';
   
   const textParts = processText(cleanedMessageText);
   
