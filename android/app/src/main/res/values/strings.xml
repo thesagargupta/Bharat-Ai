@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">BharatAI</string>
-    <string name="title_activity_main">BharatAI</string>
-    <string name="package_name">com.bharatai.app</string>
-    <string name="custom_url_scheme">com.bharatai.app</string>
-</resources>
