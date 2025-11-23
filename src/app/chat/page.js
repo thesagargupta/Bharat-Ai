@@ -247,12 +247,19 @@ function ChatContent() {
       await handleImageGeneration(messageText);
       setIsImageGenMode(false);
     } else {
-      const success = await handleSendMessage(messageText, uploadedPreview);
-      if (success && uploadedPreview) {
-        URL.revokeObjectURL(uploadedPreview);
-        setUploadedPreview(null);
-        setSelectedTools(prev => prev.filter(tool => tool !== "upload"));
-      }
+      await handleSendMessage(messageText, uploadedPreview);
+    }
+    
+    // Always clear uploaded preview and file input after sending
+    if (uploadedPreview) {
+      URL.revokeObjectURL(uploadedPreview);
+      setUploadedPreview(null);
+      setSelectedTools(prev => prev.filter(tool => tool !== "upload"));
+    }
+    
+    // Clear file input to allow re-uploading the same file
+    if (fileRef.current) {
+      fileRef.current.value = "";
     }
   };
 
