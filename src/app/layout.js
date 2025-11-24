@@ -4,6 +4,7 @@ import TopLoadingBar from '../../components/TopLoadingBar'
 import AuthProvider from '../../components/AuthProvider'
 import ServiceWorkerCleanup from '../../components/ServiceWorkerCleanup'
 import ErrorSuppressor from '../../components/ErrorSuppressor'
+import NotificationPermission from '../../components/NotificationPermission'
 import { Toaster } from 'react-hot-toast'
 
 export const metadata = {
@@ -265,6 +266,7 @@ export default function RootLayout({ children }) {
           </Suspense>
           <ServiceWorkerCleanup />
           <ErrorSuppressor />
+          <NotificationPermission />
           {children}
           <Toaster
             position="top-center"

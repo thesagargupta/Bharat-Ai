@@ -48,6 +48,76 @@ export default function SettingsPage() {
   });
   const [feedbackSent, setFeedbackSent] = useState(false);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      checkSubscription();
+    }
+  }, []);
+
+  const checkSubscription = async () => {
+    try {
+      if ("serviceWorker" in navigator && "PushManager" in window) {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        setSettings(prev => ({ ...prev, notifications: !!subscription }));
+      }
+    } catch (error) {
+      console.error("Error checking subscription:", error);
+    }
+  };
+
+  const urlBase64ToUint8Array = (base64String) => {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  const subscribeToPush = async () => {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      });
+      const response = await fetch("/api/notifications/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription }),
+      });
+      const data = await response.json();
+      return data.success;
+    } catch (error) {
+      console.error("Subscribe error:", error);
+      return false;
+    }
+  };
+
+  const unsubscribeFromPush = async () => {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (subscription) {
+        await subscription.unsubscribe();
+        await fetch("/api/notifications/subscribe", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpoint: subscription.endpoint }),
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Unsubscribe error:", error);
+      return false;
+    }
+  };
+
   // Show loading state while checking authentication
   if (status === "loading") {
     return (
@@ -65,8 +135,34 @@ export default function SettingsPage() {
     return null;
   }
 
-  const handleToggle = (key) => {
-    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+  const handleToggle = async (key) => {
+    if (key === 'notifications') {
+      if (!settings.notifications) {
+        const permission = await Notification.requestPermission();
+        if (permission === "granted") {
+          await navigator.serviceWorker.register("/sw.js");
+          const success = await subscribeToPush();
+          if (success) {
+            setSettings(prev => ({ ...prev, [key]: true }));
+            successToast("Notifications enabled!");
+          } else {
+            errorToast("Failed to enable notifications");
+          }
+        } else {
+          errorToast("Notification permission denied");
+        }
+      } else {
+        const success = await unsubscribeFromPush();
+        if (success) {
+          setSettings(prev => ({ ...prev, [key]: false }));
+          successToast("Notifications disabled!");
+        } else {
+          errorToast("Failed to disable notifications");
+        }
+      }
+    } else {
+      setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+    }
   };
 
   const handleSave = () => {
