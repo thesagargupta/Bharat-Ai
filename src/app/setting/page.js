@@ -186,26 +186,45 @@ export default function SettingsPage() {
     successToast("Your data export will be downloaded shortly.");
   };
 
-  const handleFeedbackSubmit = (e) => {
+  const handleFeedbackSubmit = async (e) => {
     e.preventDefault();
     
-    // EmailJS integration will go here
-    // For now, we'll simulate sending
-    console.log("Feedback submitted:", feedback);
+    // Show loading toast
+    const loadingToastId = 'feedback-loading';
     
-    // Simulate API call
-    setFeedbackSent(true);
-    setTimeout(() => {
-      setFeedbackSent(false);
-      setFeedback({
-        name: "",
-        email: "",
-        category: "general",
-        message: ""
+    try {
+      // Show loading state
+      setFeedbackSent(true);
+      
+      const response = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(feedback),
       });
-    }, 3000);
-    
-    successToast("Thank you for your feedback! We'll review it shortly.");
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        successToast("thank you for your feedback 🙏.");
+        // Clear form after successful submission
+        setFeedback({
+          name: "",
+          email: "",
+          category: "general",
+          message: ""
+        });
+        setFeedbackSent(false);
+      } else {
+        errorToast(data.error || "Failed to send feedback. Please try again.");
+        setFeedbackSent(false);
+      }
+    } catch (error) {
+      console.error("Error submitting feedback:", error);
+      errorToast("Failed to send feedback. Please check your connection.");
+      setFeedbackSent(false);
+    }
   };
 
   return (
@@ -531,12 +550,21 @@ export default function SettingsPage() {
                   disabled={feedbackSent}
                   className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${
                     feedbackSent
-                      ? 'bg-green-500 text-white cursor-not-allowed'
+                      ? 'bg-gray-400 text-white cursor-wait opacity-75'
                       : 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-blue-600'
                   }`}
                 >
-                  <FiSend size={18} />
-                  {feedbackSent ? 'Feedback Sent!' : 'Send Feedback'}
+                  {feedbackSent ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <FiSend size={18} />
+                      Send Feedback
+                    </>
+                  )}
                 </button>
               </div>
             </form>

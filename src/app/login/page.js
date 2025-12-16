@@ -2,7 +2,6 @@
 import { signIn, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
-import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
 import BharatAiLogo from "../logo";
 
@@ -26,12 +25,6 @@ function LoginContent() {
     await signIn("google", { callbackUrl });
   };
 
-  const handleGitHubSignIn = async () => {
-    setIsSigningIn(true);
-    setSigningInWith("github");
-    await signIn("github", { callbackUrl });
-  };
-
   if (status === "loading" || isSigningIn) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
@@ -39,7 +32,7 @@ function LoginContent() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">
             {isSigningIn 
-              ? `Signing in with ${signingInWith === "google" ? "Google" : "GitHub"}...` 
+              ? "Signing in with Google..." 
               : "Loading..."}
           </p>
         </div>
@@ -83,24 +76,6 @@ function LoginContent() {
                 <>
                   <FcGoogle className="h-5 w-5"/>
                   <span>Continue with Google</span>
-                </>
-              )}
-            </button>
-
-            <button
-              onClick={handleGitHubSignIn}
-              disabled={isSigningIn}
-              className="w-full flex items-center justify-center gap-3 bg-gray-900 hover:bg-gray-800 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 hover:shadow-lg group disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSigningIn && signingInWith === "github" ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  <span>Signing in...</span>
-                </>
-              ) : (
-                <>
-                  <FaGithub className="text-xl group-hover:scale-110 transition-transform" />
-                  <span>Continue with GitHub</span>
                 </>
               )}
             </button>
